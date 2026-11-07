@@ -159,7 +159,7 @@ before=$(git rev-list --count HEAD)
 mid=$("$BIN" log 2 | tail -1 | awk '{print $2}')
 "$BIN" abandon "$mid" >/dev/null 2>&1
 assert_eq "abandon drops one commit" "$(git rev-list --count HEAD)" "$((before - 1))"
-assert_contains "help groups by category" "$("$BIN" help)" "Editing Commits:"
+assert_contains "help groups by category" "$("$BIN" help)" "Edit saved work:"
 assert_contains "help shows Register work" "$("$BIN" help)" "Register work:"
 assert_contains "help shows Branching" "$("$BIN" help)" "Branching:"
 assert_lacks "help drops the old branching category" "$("$BIN" help)" "Branching and Committing"
@@ -211,7 +211,7 @@ assert_lacks "help has no Stash section" "$out" "Stash"
 assert_lacks "help has no stasha" "$out" "stasha"
 assert_lacks "help has no stashs" "$out" "stashs"
 assert_lacks "help has no wip verb" "$out" "wip  "
-assert_contains "help lists new" "$out" "start a wip commit"
+assert_contains "help lists new" "$out" "absorb more until you commit"
 assert_contains "help lists wt" "$out" "parallel branches, one worktree each"
 assert_contains "help lists discard" "$out" "discard (rs)"
 

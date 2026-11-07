@@ -79,7 +79,7 @@ func wipGuard() bool {
 	if !gitx.InWip() {
 		return false
 	}
-	ui.Errf("gg: HEAD is a wip commit, finalize with gg c -m \"msg\" or gg uncommit")
+	ui.Errf("gg: HEAD is a wip commit. Run gg c -m \"msg\" to finish it, or gg uncommit to drop it.")
 	return true
 }
 

@@ -35,7 +35,7 @@ func Commit(args []string) int {
 // finalizeWip turns the wip commit into the real one and drops the marker.
 func finalizeWip(flags, paths []string) int {
 	if len(paths) > 0 {
-		ui.Errf("gg c: HEAD is a wip commit, drop its marker first (gg uncommit) or commit all of it")
+		ui.Errf("gg c: HEAD is a wip commit. Name no path, or run gg uncommit first.")
 		return 1
 	}
 	if !hasMessage(flags) {
@@ -118,7 +118,7 @@ func Discard(args []string) int {
 		return gitx.Run("clean", "-f", "-d")
 	}
 	if len(paths) == 0 {
-		ui.Errf("gg discard: name a handle or path, or pass -a for everything")
+		ui.Errf("gg discard: name a path or a handle. Use -a to drop all changes.")
 		return 2
 	}
 

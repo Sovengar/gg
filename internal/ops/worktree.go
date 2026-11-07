@@ -177,7 +177,7 @@ func worktreeRemove(args []string) int {
 		return 1
 	}
 	if n := dirty(target.path); n > 0 && !force {
-		ui.Errf("gg wt rm: %s has %d dirty file(s), pass --force", name, n)
+		ui.Errf("gg wt rm: %s has %d dirty file. Use --force to remove it.", name, n)
 		return 1
 	}
 	gitArgs := []string{"worktree", "remove"}

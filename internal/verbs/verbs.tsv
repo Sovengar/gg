@@ -31,20 +31,20 @@ cl-wd	restore --source=HEAD --worktree .	wipe the working tree
 cl-sa	restore --source=HEAD --staged	wipe the index	hidden
 
 # --- Register work ---
-commit|c|ca	fn:commit	record the named changes, all when none	hint:Use -m "msg", takes handles
-new	fn:new	start a wip commit that absorbs your edits	hint:Takes -m "msg"
+commit|c|ca	fn:commit	save the changes you name, or all of them	hint:Add a message with -m. A handle names one change.
+new	fn:new	save the changes, absorb more until you commit	hint:Add a message with -m.
 empty	commit --allow-empty	record an empty commit
-
-# --- Editing Commits ---
-amend	fn:amend	fold staged changes into HEAD, or into a commit	hint:Takes a handle
 copy|cp	fn:copy	copy a commit onto a branch	hint:Takes a handle, then a branch
+uncommit	fn:uncommit	move commits back into the tree	hint:Takes handles, HEAD by default
+absorb	absorb	fold changes into the right commit
+abandon	fn:abandon	drop one commit, replay its descendants	hint:Takes a handle
+
+# --- Edit saved work ---
+amend	fn:amend	fold changes into HEAD, or into a commit	hint:Takes a handle
 reword|rename|describe|desc	fn:reword	edit the message of a commit	hint:Takes a handle
 split	fn:split	cut one commit in two	hint:Takes a handle, then -- paths
 squash	fn:squash	fold a commit into its parent	hint:Takes a handle
 move	fn:move	replay a commit onto another base	hint:Takes a handle
-uncommit	fn:uncommit	move commits back into the tree	hint:Takes handles, HEAD by default
-absorb	absorb	fold changes into the right commit
-abandon	fn:abandon	drop one commit, replay its descendants	hint:Takes a handle
 edit	fn:edit	stop a rebase at a commit	hint:Takes a handle
 
 # --- Branching ---

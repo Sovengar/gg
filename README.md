@@ -35,9 +35,9 @@ gg c -m "msg"      commit every dirty path (aliases: commit, ca)
 gg c -m "msg" kd qz  commit only those handles
 gg discard kd      drop that change, keep the rest (alias: rs)
 gg discard -a      drop everything
-gg new             start a wip commit that absorbs your edits
-gg amend           fold your edits into HEAD
-gg amend <id>      fold your edits into another commit (git history fixup)
+gg new             save the changes, then absorb more until you commit
+gg amend           fold changes into HEAD
+gg amend <id>      fold changes into another commit (git history fixup)
 gg reword <id>     edit that commit's message (aliases: rename, describe, desc)
 gg split <id> -- f cut that commit in two by paths (git history split, interactive)
 gg abandon <id>    drop that commit (git history drop)
@@ -62,7 +62,7 @@ gg tools           external tools + install state
 Unknown verbs go straight to git: `gg log --oneline -5` runs `git log --oneline -5`.
 
 Help is grouped like `but --help`: Title Case categories with a colon —
-Inspection, Changes, Register work, Editing Commits, Branching, Operations,
+Inspection, Changes, Register work, Edit saved work, Branching, Operations,
 Remote, Tools. There is no stash: the working tree, the index and wip commits
 are one mechanism (`gg new`, `gg wt`).
 The canonical name comes first, short variants in
@@ -94,7 +94,7 @@ hidden escape hatches until the handle model settles.
 
 `gg new` turns the working tree into a commit on the current branch. While that
 commit is HEAD, `gg dash` prints a `wip` badge, every verb that rewinds history
-folds your edits into it first, and `gg push` refuses until you finalize with
+folds your changes into it first, and `gg push` refuses until you finish it with
 `gg c -m "msg"` or take it back with `gg uncommit`. There is no stash.
 
 Work that must not share a checkout goes to its own worktree:
