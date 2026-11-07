@@ -24,7 +24,7 @@ type Entry struct {
 	Category    string
 	Tool        string
 	Hidden      bool
-	NoGit       bool // no git equivalent to show in help -all
+	NoGit       bool   // no git equivalent to show in help -all
 	Shown       string // name column override in help, e.g. status (st, sta, stf)
 	Fn          func(args []string) int
 }

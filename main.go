@@ -226,9 +226,9 @@ func execArgv(argv []string, verb string, m mode) int {
 	}
 	if verbs.IsMutating(verb) {
 		gitx.Snapshot()
-		if wipFold[verb] {
-			ops.WipAmend()
-		}
+	}
+	if wipFold[verb] {
+		ops.WipAmend()
 	}
 	if os.Getenv("GG_ECHO") != "" {
 		ui.Errf("+ git %s", quote(argv))
@@ -245,9 +245,9 @@ func execFunc(entry verbs.Entry, typed string, rest []string, m mode) int {
 	}
 	if verbs.IsMutating(entry.Name) {
 		gitx.Snapshot()
-		if wipFold[entry.Name] {
-			ops.WipAmend()
-		}
+	}
+	if wipFold[entry.Name] {
+		ops.WipAmend()
 	}
 	if os.Getenv("GG_ECHO") != "" {
 		ui.Errf("+ gg %s", strings.TrimSpace(typed+" "+quote(rest)))
@@ -265,9 +265,9 @@ func execTool(entry verbs.Entry, rest []string, m mode) int {
 	}
 	if verbs.IsMutating(entry.Name) {
 		gitx.Snapshot()
-		if wipFold[entry.Name] {
-			ops.WipAmend()
-		}
+	}
+	if wipFold[entry.Name] {
+		ops.WipAmend()
 	}
 	if os.Getenv("GG_ECHO") != "" {
 		ui.Errf("+ %s", quote(append([]string{entry.Tool}, argv...)))

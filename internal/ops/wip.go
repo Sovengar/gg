@@ -57,8 +57,13 @@ func WipAmend() {
 	if !gitx.Dirty() || inSequence() {
 		return
 	}
-	_ = gitx.Run("add", "-A")
-	_ = gitx.Run("commit", "--amend", "--no-edit")
+	if rc := gitx.Run("add", "-A"); rc != 0 {
+		return
+	}
+	if rc := gitx.Run("commit", "--amend", "--no-edit"); rc != 0 {
+		return
+	}
+	gitx.MarkWip() // the amend rewrote HEAD, so move the marker with it
 }
 
 // inSequence reports whether git is inside a rebase, merge or pick.
