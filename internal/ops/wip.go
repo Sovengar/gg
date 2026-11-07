@@ -16,6 +16,7 @@ var sequencePaths = []string{
 // New starts a wip commit that holds the working tree, jj style.
 func New(args []string) int {
 	msg := wipMessage(args)
+	warnPublished()
 	if gitx.InWip() {
 		// the wip commit is HEAD: fold the edits in, then start a fresh one
 		WipAmend()
@@ -27,7 +28,6 @@ func New(args []string) int {
 		return rc
 	}
 	gitx.MarkWip()
-	warnPublished()
 	return 0
 }
 
@@ -80,8 +80,13 @@ func inSequence() bool {
 	return false
 }
 
-// warnPublished warns when the wip commit already reached the upstream.
+// warnPublished warns when the wip commit is already on the upstream, where
+// folding it rewrites a published commit. The new wip commit is always
+// unpublished, so the check runs before the commit, not after it.
 func warnPublished() {
+	if !gitx.InWip() {
+		return
+	}
 	up, ok := gitx.Upstream()
 	if !ok {
 		return
@@ -89,5 +94,5 @@ func warnPublished() {
 	if _, err := gitx.Output("merge-base", "--is-ancestor", "HEAD", up); err != nil {
 		return
 	}
-	ui.Errf("gg new: HEAD is published, amending rewrites it; force-with-lease will be needed")
+	ui.Errf("gg new: this wip commit is already on %s. Take it back with gg uncommit first.", up)
 }
