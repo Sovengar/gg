@@ -23,6 +23,13 @@ assert_eq() { # name, got, want
 	if [ "$2" = "$3" ]; then ok "$1"; else no "$1 (got: $2, want: $3)"; fi
 }
 
+assert_lacks() { # name, haystack, needle
+	case "$2" in
+	*"$3"*) no "$1 (found: $3)" ;;
+	*) ok "$1" ;;
+	esac
+}
+
 build() {
 	(cd "$REPO" && GOFLAGS=-buildvcs=false "$GO" build -o "$BIN" .) || {
 		echo "build failed"
@@ -118,7 +125,7 @@ R=$(newrepo)
 cd "$R" || exit 1
 git commit -q --allow-empty -m second
 help=$("$BIN" help)
-assert_contains "help groups commit (c)" "$help" "commit (c)"
+assert_contains "help groups commit (c, ca)" "$help" "commit (c, ca)"
 assert_contains "help groups push (pu)" "$help" "push (pu)"
 assert_contains "help groups update (up)" "$help" "update (up)"
 handle=$("$BIN" log 1 | awk '{print $2}')
@@ -178,6 +185,100 @@ assert_contains "pu is push" "$("$BIN" -p pu)" "gg pu"
 assert_contains "up is update" "$("$BIN" -p up)" "gg up"
 if "$BIN" -p sync >/dev/null 2>&1; then ok "sync prints without args"; else no "sync prints without args"; fi
 if "$BIN" sync >/dev/null 2>&1; then no "sync requires a branch"; else ok "sync requires a branch"; fi
+
+echo "no stash surface"
+out=$("$BIN" help)
+assert_lacks "help has no Stash section" "$out" "Stash"
+assert_lacks "help has no stasha" "$out" "stasha"
+assert_lacks "help has no stashs" "$out" "stashs"
+assert_lacks "help has no wip verb" "$out" "wip  "
+assert_contains "help lists new" "$out" "start a wip commit"
+assert_contains "help lists wt" "$out" "parallel branches, one worktree each"
+assert_contains "help lists discard" "$out" "discard (rs)"
+
+echo "wip commit"
+R=$(newrepo)
+cd "$R" || exit 1
+echo hi > f.txt
+"$BIN" new >/dev/null 2>&1
+assert_eq "new commits a wip" "$(git log -1 --format=%s)" "wip"
+assert_eq "new leaves the tree clean" "$(git status --porcelain)" ""
+assert_eq "new marks the wip" "$(git rev-parse --verify --quiet refs/gg/wip)" "$(git rev-parse HEAD)"
+echo edit >> f.txt
+"$BIN" sw tb >/dev/null 2>&1
+assert_eq "a rewinding verb folds the edit" "$(git rev-list --count HEAD)" "2"
+assert_eq "the fold leaves the tree clean" "$(git status --porcelain)" ""
+assert_eq "the fold keeps the wip marker" "$(git rev-parse --verify --quiet refs/gg/wip)" "$(git rev-parse HEAD)"
+echo edit2 >> f.txt
+"$BIN" c -m "real" >/dev/null 2>&1
+assert_eq "c finalizes the wip" "$(git log -1 --format=%s)" "real"
+assert_eq "finalize drops the marker" "$(git rev-parse --verify --quiet refs/gg/wip || echo gone)" "gone"
+assert_eq "finalize keeps one commit" "$(git rev-list --count HEAD)" "2"
+assert_contains "finalize keeps the edits" "$(cat f.txt)" "edit2"
+
+echo "wip dash badge"
+R=$(newrepo)
+cd "$R" || exit 1
+echo hi > f.txt
+"$BIN" new >/dev/null 2>&1
+out=$("$BIN" dash)
+assert_contains "dash badges the wip" "$out" "wip"
+assert_lacks "dash never prints stash" "$out" "stash"
+
+echo "push refuses a wip"
+BARE=$(mktemp -d)/remote.git
+git init -q --bare -b tb "$BARE"
+W=$(mktemp -d)
+git clone -q "$BARE" "$W" 2>/dev/null
+cd "$W" || exit 1
+git commit -q --allow-empty -m one
+"$BIN" push >/dev/null 2>&1
+echo hi > f.txt
+"$BIN" new >/dev/null 2>&1
+out=$("$BIN" push </dev/null 2>&1)
+rc=$?
+assert_eq "push refuses the wip" "$rc" "1"
+assert_contains "push names the wip" "$out" "HEAD is a wip commit"
+"$BIN" c -m "real" >/dev/null 2>&1
+if "$BIN" push </dev/null >/dev/null 2>&1; then ok "push works after finalize"; else no "push works after finalize"; fi
+
+echo "worktrees"
+R=$(newrepo)
+cd "$R" || exit 1
+side="$(dirname "$R")/$(basename "$R").side"
+"$BIN" wt new side >/dev/null 2>&1
+if [ -f "$side/.git" ]; then ok "wt new creates a sibling worktree"; else no "wt new creates a sibling worktree"; fi
+if [ -d "$side" ]; then ok "wt new made the directory"; else no "wt new made the directory"; fi
+assert_contains "wt ls lists the branch" "$("$BIN" wt ls)" "side"
+echo dirty > "$side/x.txt"
+if "$BIN" wt rm side >/dev/null 2>&1; then no "wt rm refuses a dirty worktree"; else ok "wt rm refuses a dirty worktree"; fi
+"$BIN" wt rm side --force >/dev/null 2>&1
+if [ -d "$side" ]; then no "wt rm --force removes it"; else ok "wt rm --force removes it"; fi
+assert_lacks "wt ls forgot it" "$("$BIN" wt ls)" "side"
+
+echo "commit and discard by handle"
+R=$(newrepo)
+cd "$R" || exit 1
+echo one > a.txt
+echo two > b.txt
+git add . >/dev/null 2>&1
+git commit -q -m files
+echo edit >> a.txt
+echo fresh > c.txt
+h=$(NO_COLOR=1 "$BIN" dash | awk '$3=="a.txt"{print $1}')
+"$BIN" c -m "only a" "$h" >/dev/null 2>&1
+assert_eq "commit takes one handle" "$(git show --name-only --format= HEAD)" "a.txt"
+assert_contains "the other path stays dirty" "$(git status --porcelain)" "c.txt"
+h=$(NO_COLOR=1 "$BIN" dash | awk '$3=="c.txt"{print $1}')
+"$BIN" c -m "add c" "$h" >/dev/null 2>&1
+assert_eq "commit takes an untracked handle" "$(git show --name-only --format= HEAD)" "c.txt"
+assert_eq "nothing dirty is left" "$(git status --porcelain)" ""
+echo edit >> a.txt
+"$BIN" discard a.txt >/dev/null 2>&1
+assert_eq "discard reverts a path" "$(git status --porcelain)" ""
+echo fresh > d.txt
+"$BIN" discard d.txt >/dev/null 2>&1
+if [ -f d.txt ]; then no "discard deletes an untracked file"; else ok "discard deletes an untracked file"; fi
 
 echo
 echo "passed $pass, failed $fail"
