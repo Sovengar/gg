@@ -24,6 +24,7 @@ type Entry struct {
 	Category    string
 	Tool        string
 	Hidden      bool
+	NoGit       bool // no git equivalent to show in help -all
 	Shown       string // name column override in help, e.g. status (st, sta, stf)
 	Fn          func(args []string) int
 }
@@ -111,6 +112,9 @@ func parse(src string) map[string]Entry {
 			}
 			if field == "hidden" {
 				entry.Hidden = true
+			}
+			if field == "nogit" {
+				entry.NoGit = true
 			}
 		}
 		if fn, ok := strings.CutPrefix(snippet, "fn:"); ok {
@@ -204,6 +208,9 @@ func (e Entry) Display() string {
 
 // Command is the git command behind the verb, empty when there is none to show.
 func (e Entry) Command() string {
+	if e.NoGit {
+		return ""
+	}
 	if e.IsTool() {
 		return e.Tool
 	}

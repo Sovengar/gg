@@ -350,18 +350,6 @@ func help(argv []string) int {
 		fmt.Println()
 	}
 
-	fmt.Println(ui.Dim("Meta:"))
-	meta := [][2]string{
-		{"raw", "run git with any arguments, still undoable"},
-		{"undo", "reset --soft to the previous snapshot"},
-		{"id", "resolve a handle to a sha"},
-		{"tools", "external tools and their install state"},
-	}
-	for _, m := range meta {
-		fmt.Printf("  %s  %s\n", ui.Cyan(fmt.Sprintf("%-*s", nameWidth, m[0])), m[1])
-	}
-
-	fmt.Println()
 	fmt.Println("  flags: -n/--dry  -p/--print   help -all adds the git command behind each verb")
 	fmt.Println("  env: GG_ECHO=1 traces the git call")
 	return 0

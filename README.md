@@ -54,10 +54,12 @@ gg tools           external tools + install state
 Unknown verbs go straight to git: `gg log --oneline -5` runs `git log --oneline -5`.
 
 Help is grouped like `but --help`: Title Case categories with a colon —
-Inspection, Staging, Commit, History, Remote, Branches, Stash, Safety, Tools.
-The canonical name comes first, short variants in parentheses:
-`commit (c)`, `push (pu)`, `status (st, sta, stf)`, `reword (rename, describe, desc)`.
-Parameter notes print in grey after the description: `diff  diff the tree  Takes a path`.
+Inspection, Staging, Branching and Committing, Editing Commits, Operations,
+Remote, Stash, Tools, Others. The canonical name comes first, short variants in
+parentheses: `commit (c)`, `push (pu)`, `status (st, sta, stf)`,
+`reword (rename, describe, desc)`. Parameter notes print in grey after the
+description. Verbs that fit no group live in Others (hooks, re, cl, cl-wd,
+cl-sa, raw, id, tools).
 `gg help` shows the verb table only; `gg help -all` adds the git command behind
 each row.
 
@@ -113,7 +115,9 @@ One format everywhere: `gg log`, `gg dash` and the graph all print
 `graph handle sha age subject decorations [author]`. Lanes use box characters,
 the handle is red, the decoration `(...)` is yellow, and the ball is **green when every remote branch already has
 the commit, yellow when it is local only**. Age is compact: `30s`, `5m`, `2h`,
-`10d`, `3w`, `2mo`. `-l/--long` shows the full sha.
+`10d`, `3w`, `2mo`, painted by recency: bright green under an hour, then
+green, yellow and dim. A merge line also lists both sides it joined, as
+`{8fb1f04 62638fe}`. `-l/--long` shows the full sha.
 
 ### Dashboard
 

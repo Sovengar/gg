@@ -136,7 +136,7 @@ before=$(git rev-list --count HEAD)
 mid=$("$BIN" log 2 | tail -1 | awk '{print $2}')
 "$BIN" abandon "$mid" >/dev/null 2>&1
 assert_eq "abandon drops one commit" "$(git rev-list --count HEAD)" "$((before - 1))"
-assert_contains "help groups by category" "$("$BIN" help)" "History:"
+assert_contains "help groups by category" "$("$BIN" help)" "Editing Commits:"
 assert_contains "help shows reword" "$("$BIN" help)" "reword"
 assert_contains "help shows the git command with -all" "$("$BIN" help -all)" "git status --short"
 assert_contains "amend prints" "$("$BIN" -p amend)" "gg amend"

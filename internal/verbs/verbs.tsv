@@ -2,7 +2,8 @@
 # A snippet is a git argv (git is implied). User args are appended verbatim.
 # "fn:<name>" dispatches to a Go function, "tool:<bin>" to an external binary.
 # A "hint:" field adds a grey parameter note after the description.
-# Flags: "hidden" hides the row, "display:..." overrides the name column.
+# Flags: "hidden" hides the row, "display:..." overrides the name column,
+# "nogit" hides the git command in help -all (verbs dispatched by main's switch).
 # Mutating verbs get a snapshot in refs/gg/undo/prev plus a footer.
 # Section headers ("# --- name ---") become the categories in gg help.
 
@@ -17,58 +18,52 @@ diff	diff	diff the tree	hint:Use -w to ignore whitespace
 show	show	one commit in full	hint:Takes a handle
 files	ls-files	tracked files
 branches	branch --sort=-committerdate	branches, newest first
-reflog	reflog	where HEAD has been
 
 # --- Staging ---
 a	add	stage one path	hint:Takes a path
 aa	add -A	stage everything
 ia	add --patch	stage hunk by hunk
 us	restore --staged	unstage a path	hint:Takes a path
-cl	restore --source=HEAD --staged --worktree .	wipe tree and index
-cl-wd	restore --source=HEAD --worktree .	wipe the working tree
-cl-sa	restore --source=HEAD --staged	wipe the index
+rs	restore	restore paths	hint:Takes a path
 
-# --- Commit ---
+# --- Branching and Committing ---
 commit|c	commit	record the staged changes	hint:Use -m "msg"
 ca	commit -a	record every tracked change
+empty	commit --allow-empty	record an empty commit
+br	branch	list branches
+sw	switch	change branch	hint:Takes a branch
+cbr	switch -c	create and switch	hint:Takes a branch
+dbr	branch -d	delete a merged branch	hint:Takes a branch
+mg	merge	merge a branch into this one	hint:Takes a branch
+cp	cherry-pick	copy a commit here	hint:Takes a handle
+
+# --- Editing Commits ---
 amend	fn:amend	fold staged changes into HEAD, or into a commit	hint:Takes a handle
 reword|rename|describe|desc	fn:reword	edit the message of a commit	hint:Takes a handle
 split	fn:split	cut one commit in two	hint:Takes a handle, then -- paths
-empty	commit --allow-empty	record an empty commit
-absorb	absorb	fold changes into the right commit
-uncommit	fn:uncommit	move the last commits back into the tree	hint:Takes a count
-hooks	fn:hooks	install the Change-Id hook
-
-# --- History ---
+squash	fn:squash	fold a commit into its parent	hint:Takes a handle
 move	fn:move	replay a commit onto another base	hint:Takes a handle
+uncommit	fn:uncommit	move the last commits back into the tree	hint:Takes a count
+absorb	absorb	fold changes into the right commit
 abandon	fn:abandon	drop one commit, replay its descendants	hint:Takes a handle
 edit	fn:edit	stop a rebase at a commit	hint:Takes a handle
-squash	fn:squash	fold a commit into its parent	hint:Takes a handle
+
+# --- Operations ---
+reflog	reflog	where HEAD has been
+undo	reset --soft refs/gg/undo/prev	reset to the previous snapshot
 continue	fn:continue	resume a stopped rebase
-abort	fn:abort	abort whatever operation is stuck
+abort	fn:abort	abort whichever operation is stuck
+arb	rebase --abort	abort the rebase
+amg	merge --abort	abort the merge
 
 # --- Remote ---
 update|up	fn:update	fetch and rebase on the upstream
 push|pu	fn:push	push, refuse on drift
 sync	fn:sync	rebase on a branch, then push	hint:Takes a branch
 
-# --- Branches ---
-br	branch	list branches
-sw	switch	change branch	hint:Takes a branch
-cbr	switch -c	create and switch	hint:Takes a branch
-dbr	branch -d	delete a merged branch	hint:Takes a branch
-mg	merge	merge a branch into this one	hint:Takes a branch
-arb	rebase --abort	abort the rebase
-amg	merge --abort	abort the merge
-
 # --- Stash ---
 stasha	stash --include-untracked	stash tree and untracked files
 stashs	stash show --text	show the top stash
-
-# --- Safety ---
-cp	cherry-pick	copy a commit here	hint:Takes a handle
-re	reset	move HEAD	hint:Takes a ref
-rs	restore	restore paths	hint:Takes a path
 
 # --- Tools ---
 story	tool:gitlogue	animated history replay
@@ -76,3 +71,13 @@ mzt	tool:git-machete	branch layout maintenance
 sim	tool:git-sim	render an operation before running
 wip	tool:git-wip	save or inspect work in progress
 wt	tool:wt	worktree management
+
+# --- Others ---
+hooks	fn:hooks	install the Change-Id hook
+re	reset	move HEAD	hint:Takes a ref
+cl	restore --source=HEAD --staged --worktree .	wipe tree and index
+cl-wd	restore --source=HEAD --worktree .	wipe the working tree
+cl-sa	restore --source=HEAD --staged	wipe the index
+raw	raw	run git with any arguments, still undoable	nogit
+id	id	resolve a handle to a sha	nogit
+tools	tools	external tools and their install state	nogit
