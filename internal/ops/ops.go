@@ -19,6 +19,9 @@ func Update(args []string) int {
 
 // Sync rebases the current branch onto a named remote branch, then publishes it.
 func Sync(args []string) int {
+	if wipGuard() {
+		return 1
+	}
 	if len(args) < 1 {
 		ui.Errf("gg sync <branch>: name the branch to rebase against")
 		return 2
@@ -35,6 +38,9 @@ func Sync(args []string) int {
 
 // Push pushes, but stops when the upstream moved and asks before forcing.
 func Push(args []string) int {
+	if wipGuard() {
+		return 1
+	}
 	up, ok := gitx.Upstream()
 	if !ok {
 		ui.Errf("gg: no upstream, pushing with -u origin HEAD")
@@ -66,6 +72,15 @@ func Push(args []string) int {
 		return ask(up, args)
 	}
 	return rc
+}
+
+// wipGuard refuses to publish the wip commit.
+func wipGuard() bool {
+	if !gitx.InWip() {
+		return false
+	}
+	ui.Errf("gg: HEAD is a wip commit, finalize with gg c -m \"msg\" or gg uncommit")
+	return true
 }
 
 // printRange lists the incoming commits on stderr, so it stays above the prompt.

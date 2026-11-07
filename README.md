@@ -54,8 +54,10 @@ gg tools           external tools + install state
 Unknown verbs go straight to git: `gg log --oneline -5` runs `git log --oneline -5`.
 
 Help is grouped like `but --help`: Title Case categories with a colon —
-Inspection, Staging, Branching and Committing, Editing Commits, Operations,
-Remote, Stash, Tools, Others. The canonical name comes first, short variants in
+Inspection, Changes, Branching and Committing, Editing Commits, Operations,
+Remote, Work in progress, Worktrees, Tools, Others. There is no stash: the
+working tree, the index and wip commits are one mechanism (`gg new`, `gg wt`).
+The canonical name comes first, short variants in
 parentheses: `commit (c)`, `push (pu)`, `status (st, sta, stf)`,
 `reword (rename, describe, desc)`. Parameter notes print in grey after the
 description. Verbs that fit no group live in Others (hooks, re, cl, cl-wd,
@@ -96,7 +98,6 @@ Registered as `tool:<binary>` in `verbs.tsv`. Extra args are passed through.
 gg story           gitlogue — animated history replay
 gg mzt             git-machete — branch layout maintenance
 gg sim rebase -i HEAD~3   git-sim — render the operation first
-gg wip save        git-wip — save/inspect/list work in progress
 gg absorb          git-absorb — fold changes into the right commit
 ```
 
@@ -124,7 +125,7 @@ green, yellow and dim. A merge line also lists both sides it joined, as
 Bare `gg` prints the working state and stops there:
 
 ```
-trunk  n6 66533a6  ↑2 ↓0  stash 1
+trunk  n6 66533a6  ↑2 ↓0
 
 files
   kd  M docs/README.md
