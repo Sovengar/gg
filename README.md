@@ -26,7 +26,7 @@ gg stf             status including untracked
 gg log             short graph log, 6 commits by default, ✓ pushed / ↑ local
 gg log 20          more of it, extra args go to git log
 gg log -l 40       long line: relative age and author
-gg branches        branches sorted by recency
+gg branch          branches sorted by recency (alias: br)
 gg reflog          reflog
 gg diff -w         diff ignoring whitespace
 gg copy kd main    copy that commit onto main, back on your branch after (alias: cp)
@@ -34,13 +34,15 @@ gg copy kd         copy it onto the branch you are on
 gg c -m "msg"      commit every dirty path (aliases: commit, ca)
 gg c -m "msg" kd qz  commit only those handles
 gg discard kd      drop that change, keep the rest (alias: rs); undoable with gg undo
-gg discard -a      drop everything
+gg discard         drop every edit, keep the new files
+gg clear           drop every edit and delete the new files (-f skips the question)
 gg new             save the changes, then absorb more until you commit
 gg amend           fold changes into HEAD
 gg amend <id>      fold changes into another commit (git history fixup)
 gg reword <id>     edit that commit's message (aliases: rename, describe, desc)
 gg split <id> -- f cut that commit in two by paths (git history split, interactive)
 gg abandon <id>    drop that commit (git history drop)
+gg revert <id>     undo that commit with a new commit, safe once published (alias: rv)
 gg uncommit        move HEAD back into the working copy, change and all
 gg uncommit <id>   same for any commit, its children replayed on its parent
 gg wt new side     a worktree for a branch, one directory each
@@ -65,9 +67,9 @@ gg tools           external tools + install state
 Unknown verbs go straight to git: `gg log --oneline -5` runs `git log --oneline -5`.
 
 Help is grouped like `but --help`: Title Case categories with a colon —
-Inspection, Changes, Register work, Edit saved work, Branching, Operations,
-Remote, Tools. There is no stash: the working tree, the index and wip commits
-are one mechanism (`gg new`, `gg wt`).
+Inspection, Changes, Rollback work, Register work, Edit saved work, Branching,
+Operations, Remote, Tools. There is no stash: the working tree, the index and
+wip commits are one mechanism (`gg new`, `gg wt`).
 The canonical name comes first, short variants in
 parentheses: `commit (c)`, `push (pu)`, `status (st, sta, stf)`,
 `reword (rename, describe, desc)`. Parameter notes print in grey after the
@@ -86,24 +88,30 @@ takes handles and the index stays git's business:
 ```
 gg dash            kd M docs/README.md, px ?? notes.md
 gg c -m "docs" kd  commit one path, leave px dirty
-gg discard px      drop a change, keep the rest
+gg discard kd      drop a change, keep the rest
+gg clear           drop every edit, then delete the new files
 gg new             or park everything in a wip commit on the branch
 ```
 
-`gg discard` takes `-a` for the whole tree; `gg a` and `gg ia` still exist as
-hidden escape hatches until the handle model settles.
+`gg discard` drops edits and keeps the new files: a new file is not a change
+to drop. `gg clear` drops the edits and deletes the new files, since no commit
+holds them and git cannot bring one back; without `-f` it asks first, and
+refuses when nobody can answer. `gg a` and `gg ia` still exist as hidden
+escape hatches until the handle model settles.
 
 ### Work in progress and worktrees
 
 `gg new` turns the working tree into a commit on the current branch. While that
-commit is HEAD, `gg dash` prints a `wip` badge, every verb that rewinds history
-folds your changes into it first, and `gg push` refuses until you finish it with
-`gg c -m "msg"` or take it back with `gg uncommit`. There is no stash.
+commit is HEAD, `gg dash` prints a `wip` badge, the verbs that rewind history
+fold your changes into it first (`gg sw`, `gg update`, `gg sync`, `gg amend`,
+`gg copy`, `gg uncommit`), and `gg push` refuses until you finish it with
+`gg c -m "msg"` or take it back with `gg uncommit`. `gg c` with no message
+refuses while in wip mode. There is no stash.
 
 Work that must not share a checkout goes to its own worktree:
 
 ```
-gg wt new side     sibling directory <repo>.side on branch side
+gg wt new side     sibling directory <repo>.side on branch side; folds wip first
 gg wt ls           branch, path, and how dirty each worktree is
 gg wt rm side      remove it; --force when it is dirty
 ```
@@ -211,7 +219,7 @@ interactive rebase on that commit, you amend it, and `gg continue` resumes.
   (tracked and untracked, `.gitignore` respected). `gg oplog` lists them newest first,
   `gg undo` restores the state before the last operation, `gg undo N` goes back N
   entries, and `gg redo` moves forward again when the last action was an undo. This
-  also makes `gg discard` revertible. The newest 100 entries are kept.
+  also makes `gg discard` and `gg clear` revertible. The newest 100 entries are kept.
 - Every mutating verb ends with a footer: `@ <sha> · ahead N · behind M`.
 - `gg push` never force-pushes on its own. It reports the drift, lists the incoming
   commits, and asks: update, force-with-lease, or abort. Non-interactive runs refuse.

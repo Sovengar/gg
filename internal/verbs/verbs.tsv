@@ -16,23 +16,21 @@ log	fn:log	graph log, 6 commits by default	hint:Takes a count, -l for long lines
 dash	fn:dash	dashboard: branch, files, commits	hidden
 diff	diff	diff the tree	hint:Use -w to ignore whitespace
 show	show	one commit in full	hint:Takes a handle
-branches	branch --sort=-committerdate	branches, newest first
+branch|br|branches	branch --sort=-committerdate	branches, newest first	display:branch (br)
 id	id	resolve a handle to a sha	nogit
 
 # --- Changes ---
 a	add	-	hidden
 aa	add -A	-	hidden
 ia	add --patch	-	hidden
-us	restore --staged	-	hidden
 
 
 # --- Rollback work ---
-discard|rs	fn:discard	drop changes, keep the rest	hint:Takes a handle, -a for all
-cl	restore --source=HEAD --staged --worktree .	wipe tree and index
-cl-wd	restore --source=HEAD --worktree .	wipe the working tree
-cl-sa	restore --source=HEAD --staged	wipe the index	hidden
+discard|rs	fn:discard	drop edits, keep new files	hint:Bare drops all. Takes a handle or a path
+clear|cl	fn:clear	drop edits and new files, back to HEAD	hint:Asks before deleting new files, -f skips
 uncommit	fn:uncommit	move commits back into the tree	hint:Takes handles, HEAD by default
 abandon	fn:abandon	drop one commit, replay its descendants	hint:Takes a handle
+revert|rv	fn:revert	undo one commit with a new commit	hint:Takes a handle, -m N for a merge
 
 # --- Register work ---
 commit|c|ca	fn:commit	save the changes you name, or all of them	hint:Add a message with -m. A handle names one change.
@@ -50,9 +48,8 @@ move	fn:move	replay a commit onto another base	hint:Takes a handle
 edit	fn:edit	stop a rebase at a commit	hint:Takes a handle
 
 # --- Branching ---
-br	branch	list branches
 sw	switch	change branch	hint:Takes a branch
-cbr	switch -c	create and switch	hint:Takes a branch
+cbr	switch -c	branch new and switch	hint:Takes a branch	display:branch new (cbr)
 dbr	branch -d	delete a merged branch	hint:Takes a branch
 mg	merge	merge a branch into this one	hint:Takes a branch
 wt	fn:wt	parallel branches, one worktree each	hint:Takes new|ls|rm

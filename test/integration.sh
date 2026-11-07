@@ -89,13 +89,19 @@ git add tracked.txt >/dev/null 2>&1
 git commit -q -m tracked
 echo edit >> tracked.txt
 echo fresh > untracked.txt
-"$BIN" discard -a >/dev/null 2>&1
+"$BIN" discard >/dev/null 2>&1
 assert_contains "oplog lists the verb" "$("$BIN" oplog)" "discard"
 assert_eq "discard restored the tracked file" "$(cat tracked.txt)" "keep"
-if [ -f untracked.txt ]; then no "discard deleted the untracked file"; else ok "discard deleted the untracked file"; fi
+if [ -f untracked.txt ]; then ok "discard keeps the new file"; else no "discard keeps the new file"; fi
 "$BIN" undo >/dev/null 2>&1
 assert_contains "undo restores the discarded tracked file" "$(cat tracked.txt)" "edit"
-if [ -f untracked.txt ]; then ok "undo restores the deleted untracked file"; else no "undo restores the deleted untracked file"; fi
+
+"$BIN" clear -f >/dev/null 2>&1
+assert_eq "clear restored the tracked file" "$(cat tracked.txt)" "keep"
+if [ -f untracked.txt ]; then no "clear deletes the new file"; else ok "clear deletes the new file"; fi
+"$BIN" undo >/dev/null 2>&1
+assert_contains "undo restores the cleared tracked file" "$(cat tracked.txt)" "edit"
+if [ -f untracked.txt ]; then ok "undo restores the deleted new file"; else no "undo restores the deleted new file"; fi
 
 R=$(newrepo)
 cd "$R" || exit 1
@@ -215,6 +221,8 @@ assert_contains "split prints" "$("$BIN" -p split ab -- f.txt)" "gg split ab -- 
 echo "renamed verbs"
 assert_contains "reflog verb" "$("$BIN" -p reflog)" "reflog"
 assert_contains "branches verb" "$("$BIN" -p branches)" "branch --sort"
+assert_contains "br alias" "$("$BIN" -p br)" "branch --sort"
+assert_contains "branch verb" "$("$BIN" -p branch)" "branch --sort"
 assert_contains "log alias renders" "$("$BIN" -p log 3)" "gg log 3"
 assert_eq "dw is gone" "$("$BIN" -p dw)" "git dw"
 assert_contains "diff takes -w" "$("$BIN" -p diff -w)" "git diff -w"
@@ -256,6 +264,9 @@ assert_lacks "help has no wip verb" "$out" "wip  "
 assert_contains "help lists new" "$out" "absorb more until you commit"
 assert_contains "help lists wt" "$out" "parallel branches, one worktree each"
 assert_contains "help lists discard" "$out" "discard (rs)"
+assert_contains "help lists clear" "$out" "clear"
+assert_lacks "help has no cl verb" "$out" "wipe tree and index"
+assert_lacks "help has no cl-wd verb" "$out" "wipe the working tree"
 
 echo "wip commit"
 R=$(newrepo)
@@ -276,6 +287,15 @@ assert_eq "c finalizes the wip" "$(git log -1 --format=%s)" "real"
 assert_eq "finalize drops the marker" "$(git rev-parse --verify --quiet refs/gg/wip || echo gone)" "gone"
 assert_eq "finalize keeps one commit" "$(git rev-list --count HEAD)" "2"
 assert_contains "finalize keeps the edits" "$(cat f.txt)" "edit2"
+
+"$BIN" new -m "wip two" >/dev/null 2>&1
+if "$BIN" c >/dev/null 2>&1; then no "c without a message refuses in wip mode"; else ok "c without a message refuses in wip mode"; fi
+assert_eq "the refused c keeps the marker" "$(git rev-parse --verify --quiet refs/gg/wip)" "$(git rev-parse HEAD)"
+echo late >> f.txt
+"$BIN" uncommit >/dev/null 2>&1
+assert_eq "uncommit takes the wip back" "$(git status --porcelain | tr -d ' ')" "Mf.txt"
+assert_eq "uncommit drops the marker" "$(git rev-parse --verify --quiet refs/gg/wip || echo gone)" "gone"
+assert_eq "uncommit keeps the committed work" "$(git log -1 --format=%s)" "real"
 
 echo "wip dash badge"
 R=$(newrepo)
@@ -311,11 +331,27 @@ side="$(dirname "$R")/$(basename "$R").side"
 if [ -f "$side/.git" ]; then ok "wt new creates a sibling worktree"; else no "wt new creates a sibling worktree"; fi
 if [ -d "$side" ]; then ok "wt new made the directory"; else no "wt new made the directory"; fi
 assert_contains "wt ls lists the branch" "$("$BIN" wt ls)" "side"
+assert_lacks "wt ls prints no footer" "$("$BIN" wt ls)" "ahead"
+if "$BIN" wt rm tb >/dev/null 2>&1; then no "wt rm refuses the main worktree"; else ok "wt rm refuses the main worktree"; fi
 echo dirty > "$side/x.txt"
 if "$BIN" wt rm side >/dev/null 2>&1; then no "wt rm refuses a dirty worktree"; else ok "wt rm refuses a dirty worktree"; fi
 "$BIN" wt rm side --force >/dev/null 2>&1
 if [ -d "$side" ]; then no "wt rm --force removes it"; else ok "wt rm --force removes it"; fi
 assert_lacks "wt ls forgot it" "$("$BIN" wt ls)" "side"
+
+echo "wt new folds a wip first"
+R=$(newrepo)
+cd "$R" || exit 1
+echo base > f.txt
+git add . >/dev/null 2>&1
+git commit -q -m base
+"$BIN" new >/dev/null 2>&1
+echo carried >> f.txt
+side="$(dirname "$R")/$(basename "$R").side"
+"$BIN" wt new side >/dev/null 2>&1
+assert_contains "wt new folds the edit into the wip" "$(git -C "$side" show HEAD:f.txt)" "carried"
+assert_eq "wt new leaves the main tree clean" "$(git status --porcelain)" ""
+"$BIN" wt rm side >/dev/null 2>&1
 
 echo "commit and discard by handle"
 R=$(newrepo)
@@ -339,7 +375,36 @@ echo edit >> a.txt
 assert_eq "discard reverts a path" "$(git status --porcelain)" ""
 echo fresh > d.txt
 "$BIN" discard d.txt >/dev/null 2>&1
-if [ -f d.txt ]; then no "discard deletes an untracked file"; else ok "discard deletes an untracked file"; fi
+if [ -f d.txt ]; then ok "discard refuses a new file"; else no "discard refuses a new file"; fi
+"$BIN" clear -f >/dev/null 2>&1
+if [ -f d.txt ]; then no "clear deletes a new file"; else ok "clear deletes a new file"; fi
+
+echo "revert keeps the original commit"
+R=$(newrepo)
+cd "$R" || exit 1
+echo one > a.txt
+git add . >/dev/null 2>&1
+git commit -q -m first
+echo two > a.txt
+git add . >/dev/null 2>&1
+git commit -q -m second
+h=$(git rev-parse HEAD)
+before=$(git log --oneline | wc -l | tr -d ' ')
+"$BIN" revert "$h" >/dev/null 2>&1
+assert_eq "revert restored the content" "$(cat a.txt)" "one"
+after=$(git log --oneline | wc -l | tr -d ' ')
+assert_eq "revert added one commit" "$after" "$((before + 1))"
+assert_contains "oplog lists revert" "$("$BIN" oplog)" "revert"
+"$BIN" undo >/dev/null 2>&1
+assert_eq "undo steps back over revert" "$(cat a.txt)" "two"
+"$BIN" rv --help >/dev/null 2>&1
+if [ "$?" -eq 2 ]; then no "revert needs a commit"; else ok "revert needs a commit"; fi
+echo x >> a.txt
+"$BIN" new >/dev/null 2>&1
+if "$BIN" revert HEAD >/dev/null 2>&1; then no "revert refuses a wip"; else ok "revert refuses a wip"; fi
+
+assert_contains "help lists clear as cl" "$("$BIN" help)" "clear (cl)"
+assert_contains "help lists revert as rv" "$("$BIN" help)" "revert (rv)"
 
 echo "copy a commit onto a branch"
 R=$(newrepo)
