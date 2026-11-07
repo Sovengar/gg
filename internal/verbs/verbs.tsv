@@ -1,0 +1,75 @@
+# gg verb registry — TAB separated: <verb>\t<snippet>\t<description>
+# A snippet is a git argv (git is implied). User args are appended verbatim.
+# "fn:<name>" dispatches to a Go function, "tool:<bin>" to an external binary.
+# Mutating verbs get a snapshot in refs/gg/undo/prev plus a footer.
+# Section headers ("# --- name ---") become the categories in gg help.
+
+# --- inspect ---
+st	status --short	short: short status (sta full, stf + untracked)
+sta	status	-	hidden
+stf	status --short --untracked-files=all	-	hidden
+log	fn:log	graph log, 6 commits by default
+dash	fn:dash	dashboard: branch, files, commits	hidden
+diff	diff	diff the tree (-w ignores whitespace)
+show	show	one commit in full
+files	ls-files	tracked files
+branches	branch --sort=-committerdate	branches, newest first
+reflog	reflog	where HEAD has been
+
+# --- staging ---
+a	add	stage one path
+aa	add -A	stage everything
+ia	add --patch	stage hunk by hunk
+us	restore --staged	unstage a path
+cl	restore --source=HEAD --staged --worktree .	wipe tree and index
+cl-wd	restore --source=HEAD --worktree .	wipe the working tree
+cl-sa	restore --source=HEAD --staged	wipe the index
+
+# --- commit ---
+c|commit	commit	record the staged changes
+ca	commit -a	record every tracked change
+amend	fn:amend	fold staged changes into HEAD, or into a commit
+reword	fn:reword	edit the message of a commit
+split	fn:split	cut one commit in two
+empty	commit --allow-empty	record an empty commit
+absorb	absorb	fold changes into the right commit
+uncommit	fn:uncommit	move the last commits back into the tree
+hooks	fn:hooks	install the Change-Id hook
+
+# --- history ---
+move	fn:move	replay a commit onto another base
+abandon	fn:abandon	drop one commit, replay its descendants
+edit	fn:edit	stop a rebase at a commit
+squash	fn:squash	fold a commit into its parent
+continue	fn:continue	resume a stopped rebase
+abort	fn:abort	abort whatever operation is stuck
+
+# --- remote ---
+up|update	fn:update	fetch and rebase on the upstream
+pu|push	fn:push	push, refuse on drift
+sync	fn:sync	rebase on a branch, then push
+
+# --- branches ---
+br	branch	list branches
+sw	switch	change branch
+cbr	switch -c	create and switch
+dbr	branch -d	delete a merged branch
+mg	merge	merge a branch into this one
+arb	rebase --abort	abort the rebase
+amg	merge --abort	abort the merge
+
+# --- stash ---
+stasha	stash --include-untracked	stash tree and untracked files
+stashs	stash show --text	show the top stash
+
+# --- safety ---
+cp	cherry-pick	copy a commit here
+re	reset	move HEAD
+rs	restore	restore paths
+
+# --- tools ---
+story	tool:gitlogue	animated history replay
+mzt	tool:git-machete	branch layout maintenance
+sim	tool:git-sim	render an operation before running it
+wip	tool:git-wip	save or inspect work in progress
+wt	tool:wt	worktree management
