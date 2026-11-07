@@ -47,7 +47,7 @@ func run(argv []string) int {
 
 	switch args[0] {
 	case "help":
-		return help()
+		return help(args[1:])
 	case "version":
 		fmt.Println("gg " + version)
 		return 0
@@ -298,7 +298,14 @@ func footer(verb string) {
 	fmt.Println(ui.Dim(fmt.Sprintf("  %s · ahead %s · behind %s", handleIndex().Short(sha), ahead, behind)))
 }
 
-func help() int {
+func help(argv []string) int {
+	all := false
+	for _, a := range argv {
+		if a == "-all" || a == "--all" {
+			all = true
+		}
+	}
+
 	entries := verbs.All()
 
 	var order []string
@@ -330,8 +337,10 @@ func help() int {
 				continue
 			}
 			line := fmt.Sprintf("  %s  %-*s", ui.Cyan(fmt.Sprintf("%-*s", nameWidth, e.Display())), descWidth, e.Description)
-			if cmd := e.Command(); cmd != "" {
-				line += "  " + ui.Dim(cmd)
+			if all {
+				if cmd := e.Command(); cmd != "" {
+					line += "  " + ui.Dim(cmd)
+				}
 			}
 			fmt.Println(strings.TrimRight(line, " "))
 		}
@@ -350,7 +359,8 @@ func help() int {
 	}
 
 	fmt.Println()
-	fmt.Println("  flags: -n/--dry  -p/--print   env: GG_ECHO=1 traces the git call")
+	fmt.Println("  flags: -n/--dry  -p/--print   help -all adds the git command behind each verb")
+	fmt.Println("  env: GG_ECHO=1 traces the git call")
 	return 0
 }
 

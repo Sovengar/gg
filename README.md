@@ -21,7 +21,7 @@ GOROOT= ~/.local/share/mise/installs/go/1.27.3/bin/go build -o ~/.local/bin/gg .
 
 ```
 gg                 dashboard: branch, files, commits, branches
-gg st              status --short
+gg st/sta/stf      Status, Status all or Status with files untracked
 gg stf             status including untracked
 gg log             short graph log, 6 commits by default, ✓ pushed / ↑ local
 gg log 20          more of it, extra args go to git log
@@ -47,6 +47,7 @@ gg abort           abort whichever operation is stuck: rebase, merge, cherry-pic
 gg undo            reset --soft to the last snapshot
 gg raw log -5      anything goes, still snapshotted
 gg help            verb table
+gg help -all       verb table + the git command behind each verb
 gg tools           external tools + install state
 ```
 
@@ -54,7 +55,8 @@ Unknown verbs go straight to git: `gg log --oneline -5` runs `git log --oneline 
 
 Help is grouped by action: inspect, staging, commit, history, remote, branches,
 stash, safety, tools. Aliases share one row: `c/commit`, `pu/push`, `up/update`.
-Each row shows the git command when the verb is a single git call.
+`gg help` shows the verb table only; `gg help -all` adds the git command behind
+each row.
 
 Flags: `-p/--print`, `-n/--dry` print the resolved command instead of running.
 Environment: `GG_ECHO=1` traces the git call, `NO_COLOR=1` disables colour.
@@ -106,7 +108,7 @@ is one line in `internal/verbs/verbs.tsv`; no Go change.
 
 One format everywhere: `gg log`, `gg dash` and the graph all print
 `graph handle sha age subject decorations [author]`. Lanes use box characters,
-the handle is red, and the ball is **green when every remote branch already has
+the handle is red, the decoration `(...)` is yellow, and the ball is **green when every remote branch already has
 the commit, yellow when it is local only**. Age is compact: `30s`, `5m`, `2h`,
 `10d`, `3w`, `2mo`. `-l/--long` shows the full sha.
 

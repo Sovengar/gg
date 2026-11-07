@@ -221,7 +221,7 @@ func (r *renderer) line(raw string) string {
 	b.WriteString(subject)
 	if deco != "" {
 		b.WriteString(" ")
-		b.WriteString(deco)
+		b.WriteString(ui.Yellow(deco))
 	}
 	b.WriteString(" ")
 	b.WriteString(ui.Blue("[" + author + "]"))

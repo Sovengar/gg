@@ -5,9 +5,10 @@
 # Section headers ("# --- name ---") become the categories in gg help.
 
 # --- inspect ---
-st	status --short	short: short status (sta full, stf + untracked)
+st	status --short	Status, Status all or Status with files untracked	display:st/sta/stf
 sta	status	-	hidden
 stf	status --short --untracked-files=all	-	hidden
+
 log	fn:log	graph log, 6 commits by default
 dash	fn:dash	dashboard: branch, files, commits	hidden
 diff	diff	diff the tree (-w ignores whitespace)

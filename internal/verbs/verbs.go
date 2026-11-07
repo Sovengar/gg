@@ -23,6 +23,7 @@ type Entry struct {
 	Category    string
 	Tool        string
 	Hidden      bool
+	Shown       string // name column override in help, e.g. st/sta/stf
 	Fn          func(args []string) int
 }
 
@@ -96,7 +97,14 @@ func parse(src string) map[string]Entry {
 			Snippet:     snippet,
 			Description: strings.TrimSpace(description),
 			Category:    category,
-			Hidden:      strings.TrimSpace(flags) == "hidden",
+		}
+		for _, tok := range strings.Fields(flags) {
+			switch {
+			case tok == "hidden":
+				entry.Hidden = true
+			case strings.HasPrefix(tok, "display:"):
+				entry.Shown = strings.TrimPrefix(tok, "display:")
+			}
 		}
 		if fn, ok := strings.CutPrefix(snippet, "fn:"); ok {
 			entry.Fn = functions[fn]
@@ -171,8 +179,12 @@ func All() []Entry {
 }
 
 // Describe is the one-line help text for the verb.
-// Display is the name column in help, aliases joined with a slash.
+// Display is the name column in help, aliases joined with a slash, or the
+// explicit display: override when the registry sets one.
 func (e Entry) Display() string {
+	if e.Shown != "" {
+		return e.Shown
+	}
 	return strings.ReplaceAll(e.Label, "|", "/")
 }
 

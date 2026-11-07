@@ -42,8 +42,13 @@ build
 
 echo "help and registry"
 out=$("$BIN" help)
-assert_contains "help lists st" "$out" "status --short"
+assert_contains "help lists st" "$out" "st/sta/stf"
 assert_contains "help lists raw" "$out" "raw"
+assert_contains "help -all shows git command" "$("$BIN" help -all)" "git status --short"
+case "$out" in
+*"git status --short"*) no "default help hides git command" ;;
+*) ok "default help hides git command" ;;
+esac
 assert_contains "verbs names" "$("$BIN" verbs)" "log"
 
 echo "read-only verbs"
@@ -133,7 +138,7 @@ mid=$("$BIN" log 2 | tail -1 | awk '{print $2}')
 assert_eq "abandon drops one commit" "$(git rev-list --count HEAD)" "$((before - 1))"
 assert_contains "help groups by category" "$("$BIN" help)" "history"
 assert_contains "help shows reword" "$("$BIN" help)" "reword"
-assert_contains "help shows the git command" "$("$BIN" help)" "git status --short"
+assert_contains "help shows the git command with -all" "$("$BIN" help -all)" "git status --short"
 assert_contains "amend prints" "$("$BIN" -p amend)" "gg amend"
 assert_contains "reword prints" "$("$BIN" -p reword ab)" "gg reword ab"
 assert_contains "split prints" "$("$BIN" -p split ab -- f.txt)" "gg split ab -- f.txt"
