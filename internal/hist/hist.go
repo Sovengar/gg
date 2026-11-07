@@ -21,8 +21,9 @@ import (
 // DefaultLimit is how many commits log shows when no count is given.
 const DefaultLimit = 6
 
-// record is the git format: one field separator per column.
-const record = "%H%x1f%h%x1f%ct%x1f%d%x1f%s%x1f%an%x1f%G?"
+// record is the git format: one field separator per column. The last field
+// holds every parent sha, so a merge line can show both sides.
+const record = "%H%x1f%h%x1f%ct%x1f%d%x1f%s%x1f%an%x1f%G?%x1f%p"
 
 const pushedLimit = "5000"
 
@@ -201,10 +202,11 @@ func (r *renderer) line(raw string) string {
 	}
 
 	fields := strings.Split(raw[start:], "\x1f")
-	if len(fields) < 7 {
+	if len(fields) < 8 {
 		return raw
 	}
 	sha, short, epoch, deco, subject, author, sig := fields[0], fields[1], fields[2], fields[3], fields[4], fields[5], fields[6]
+	parents := fields[7]
 
 	ball := ui.BrightMagenta("●")
 	if r.pushed[sha] {
@@ -223,12 +225,16 @@ func (r *renderer) line(raw string) string {
 	b.WriteString(" ")
 	b.WriteString(ui.Dim(shown))
 	b.WriteString(" ")
-	b.WriteString(ui.Dim(age(epoch)))
+	b.WriteString(age(epoch))
 	b.WriteString(" ")
 	b.WriteString(subject)
 	if deco != "" {
 		b.WriteString(" ")
 		b.WriteString(ui.Yellow(deco))
+	}
+	if p := mergeParents(parents); p != "" {
+		b.WriteString(" ")
+		b.WriteString(ui.Magenta(p))
 	}
 	b.WriteString(" ")
 	b.WriteString(ui.Blue("[" + author + "]"))
@@ -239,27 +245,64 @@ func (r *renderer) line(raw string) string {
 	return b.String()
 }
 
-// age renders a compact relative time: 5m, 2h, 10d, 3w.
+// age renders a compact relative time: 5m, 2h, 10d, 3w, painted by how
+// recent it is: bright green for minutes, then green, yellow, and dim.
 func age(epoch string) string {
-	secs, err := strconv.ParseInt(strings.TrimSpace(epoch), 10, 64)
-	if err != nil {
+	n, txt := ageText(epoch)
+	if txt == "" {
 		return ""
 	}
+	switch {
+	case n < int64(time.Hour/time.Second):
+		return ui.BrightGreen(txt)
+	case n < int64(24*time.Hour/time.Second):
+		return ui.Green(txt)
+	case n < int64(7*24*time.Hour/time.Second):
+		return ui.Yellow(txt)
+	default:
+		return ui.Dim(txt)
+	}
+}
+
+// ageText returns the age in seconds and its compact label.
+func ageText(epoch string) (int64, string) {
+	secs, err := strconv.ParseInt(strings.TrimSpace(epoch), 10, 64)
+	if err != nil {
+		return 0, ""
+	}
 	d := time.Since(time.Unix(secs, 0))
+	n := int64(d.Seconds())
 	switch {
 	case d < time.Minute:
-		return fmt.Sprintf("%ds", int(d.Seconds()))
+		return n, fmt.Sprintf("%ds", int(d.Seconds()))
 	case d < time.Hour:
-		return fmt.Sprintf("%dm", int(d.Minutes()))
+		return n, fmt.Sprintf("%dm", int(d.Minutes()))
 	case d < 24*time.Hour:
-		return fmt.Sprintf("%dh", int(d.Hours()))
+		return n, fmt.Sprintf("%dh", int(d.Hours()))
 	case d < 7*24*time.Hour:
-		return fmt.Sprintf("%dd", int(d.Hours()/24))
+		return n, fmt.Sprintf("%dd", int(d.Hours()/24))
 	case d < 30*24*time.Hour:
-		return fmt.Sprintf("%dw", int(d.Hours()/24/7))
+		return n, fmt.Sprintf("%dw", int(d.Hours()/24/7))
 	default:
-		return fmt.Sprintf("%dmo", int(d.Hours()/24/30))
+		return n, fmt.Sprintf("%dmo", int(d.Hours()/24/30))
 	}
+}
+
+// mergeParents renders the two sides of a merge as {short1 short2}. An
+// ordinary commit has one parent and gets no braces.
+func mergeParents(field string) string {
+	ps := strings.Fields(field)
+	if len(ps) < 2 {
+		return ""
+	}
+	shorts := make([]string, 0, len(ps))
+	for _, p := range ps {
+		if len(p) > 7 {
+			p = p[:7]
+		}
+		shorts = append(shorts, p)
+	}
+	return "{" + strings.Join(shorts, " ") + "}"
 }
 
 // shaStart finds where a 40 character sha begins, ignoring hex inside words.
