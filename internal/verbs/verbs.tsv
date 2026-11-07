@@ -27,6 +27,7 @@ us	restore --staged	-	hidden
 
 # --- Branching and Committing ---
 commit|c|ca	fn:commit	record the named changes, all when none	hint:Use -m "msg", takes handles
+new	fn:new	start a wip commit that absorbs your edits	hint:Takes -m "msg"
 empty	commit --allow-empty	record an empty commit
 br	branch	list branches
 sw	switch	change branch	hint:Takes a branch
@@ -56,9 +57,6 @@ abort	fn:abort	abort whichever operation is stuck
 update|up	fn:update	fetch and rebase on the upstream
 push|pu	fn:push	push, refuse on drift
 sync	fn:sync	rebase on a branch, then push	hint:Takes a branch
-
-# --- Work in progress ---
-new	fn:new	start a wip commit that absorbs your edits	hint:Takes -m "msg"
 
 # --- Worktrees ---
 wt	fn:wt	parallel branches, one worktree each	hint:Takes new|ls|rm

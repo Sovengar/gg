@@ -63,7 +63,7 @@ Unknown verbs go straight to git: `gg log --oneline -5` runs `git log --oneline 
 
 Help is grouped like `but --help`: Title Case categories with a colon —
 Inspection, Changes, Branching and Committing, Editing Commits, Operations,
-Remote, Work in progress, Worktrees, Tools, Others. There is no stash: the
+Remote, Worktrees, Tools, Others. There is no stash: the
 working tree, the index and wip commits are one mechanism (`gg new`, `gg wt`).
 The canonical name comes first, short variants in
 parentheses: `commit (c)`, `push (pu)`, `status (st, sta, stf)`,
