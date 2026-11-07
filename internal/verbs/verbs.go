@@ -58,6 +58,7 @@ var functions = map[string]func([]string) int{
 	"continue": ops.Continue,
 	"abort":    ops.Abort,
 	"hooks":    ops.InstallHooks,
+	"wt":       ops.Worktree,
 }
 
 // mutating verbs get a snapshot and a footer.
@@ -66,7 +67,7 @@ var mutating = map[string]bool{
 	"split": true, "squash": true, "absorb": true, "empty": true,
 	"move": true, "publish": true, "sync": true, "update": true, "undo": true,
 	"abandon": true, "cp": true, "push": true, "pu": true, "up": true,
-	"edit": true, "continue": true, "hooks": true, "abort": true,
+	"edit": true, "continue": true, "hooks": true, "abort": true, "wt": true,
 	"reword": true, "rename": true, "describe": true, "desc": true,
 }
 

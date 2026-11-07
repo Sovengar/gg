@@ -61,11 +61,13 @@ update|up	fn:update	fetch and rebase on the upstream
 push|pu	fn:push	push, refuse on drift
 sync	fn:sync	rebase on a branch, then push	hint:Takes a branch
 
+# --- Worktrees ---
+wt	fn:wt	parallel branches, one worktree each	hint:Takes new|ls|rm
+
 # --- Tools ---
 story	tool:gitlogue	animated history replay
 mzt	tool:git-machete	branch layout maintenance
 sim	tool:git-sim	render an operation before running
-wt	tool:wt	worktree management
 
 # --- Others ---
 hooks	fn:hooks	install the Change-Id hook
