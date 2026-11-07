@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -183,11 +184,17 @@ func (r *renderer) render(src io.Reader) []string {
 	return out
 }
 
+// ansi matches SGR escape sequences. git runs with --color=always on a TTY,
+// so its graph arrives pre-coloured; gg strips that and paints every line
+// itself, otherwise graph() would re-wrap git's ESC bytes and corrupt them.
+var ansi = regexp.MustCompile("\\x1b\\[[0-9;]*m")
+
 // line turns one git line into a gg line:
 //
 //	<graph> <handle> <sha> <age> <subject> <decorations> [author]
 func (r *renderer) line(raw string) string {
 	raw = strings.TrimRight(raw, "\r")
+	raw = ansi.ReplaceAllString(raw, "")
 	start := shaStart(raw)
 	if start < 0 {
 		return graph(raw, "")
