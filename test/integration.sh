@@ -42,7 +42,7 @@ build
 
 echo "help and registry"
 out=$("$BIN" help)
-assert_contains "help lists st" "$out" "st/sta/stf"
+assert_contains "help lists status" "$out" "status (st, sta, stf)"
 assert_contains "help lists raw" "$out" "raw"
 assert_contains "help -all shows git command" "$("$BIN" help -all)" "git status --short"
 case "$out" in
@@ -118,9 +118,9 @@ R=$(newrepo)
 cd "$R" || exit 1
 git commit -q --allow-empty -m second
 help=$("$BIN" help)
-assert_contains "help groups c/commit" "$help" "c/commit"
-assert_contains "help groups pu/push" "$help" "pu/push"
-assert_contains "help groups up/update" "$help" "up/update"
+assert_contains "help groups commit (c)" "$help" "commit (c)"
+assert_contains "help groups push (pu)" "$help" "push (pu)"
+assert_contains "help groups update (up)" "$help" "update (up)"
 handle=$("$BIN" log 1 | awk '{print $2}')
 "$BIN" edit "$handle" >/dev/null 2>&1
 assert_eq "edit stops the rebase" "$(git rev-parse --abbrev-ref HEAD)" "HEAD"
@@ -136,7 +136,7 @@ before=$(git rev-list --count HEAD)
 mid=$("$BIN" log 2 | tail -1 | awk '{print $2}')
 "$BIN" abandon "$mid" >/dev/null 2>&1
 assert_eq "abandon drops one commit" "$(git rev-list --count HEAD)" "$((before - 1))"
-assert_contains "help groups by category" "$("$BIN" help)" "history"
+assert_contains "help groups by category" "$("$BIN" help)" "History:"
 assert_contains "help shows reword" "$("$BIN" help)" "reword"
 assert_contains "help shows the git command with -all" "$("$BIN" help -all)" "git status --short"
 assert_contains "amend prints" "$("$BIN" -p amend)" "gg amend"

@@ -1,76 +1,78 @@
-# gg verb registry — TAB separated: <verb>\t<snippet>\t<description>
+# gg verb registry — TAB separated: <verb>\t<snippet>\t<description>[\thint:...][\tflags]
 # A snippet is a git argv (git is implied). User args are appended verbatim.
 # "fn:<name>" dispatches to a Go function, "tool:<bin>" to an external binary.
+# A "hint:" field adds a grey parameter note after the description.
+# Flags: "hidden" hides the row, "display:..." overrides the name column.
 # Mutating verbs get a snapshot in refs/gg/undo/prev plus a footer.
 # Section headers ("# --- name ---") become the categories in gg help.
 
-# --- inspect ---
-st	status --short	Status, Status all or Status with files untracked	display:st/sta/stf
+# --- Inspection ---
+status|st	status --short	Status, Status all or Status with files untracked	display:status (st, sta, stf)
 sta	status	-	hidden
 stf	status --short --untracked-files=all	-	hidden
 
-log	fn:log	graph log, 6 commits by default
+log	fn:log	graph log, 6 commits by default	hint:Takes a count, -l for long lines
 dash	fn:dash	dashboard: branch, files, commits	hidden
-diff	diff	diff the tree (-w ignores whitespace)
-show	show	one commit in full
+diff	diff	diff the tree	hint:Use -w to ignore whitespace
+show	show	one commit in full	hint:Takes a handle
 files	ls-files	tracked files
 branches	branch --sort=-committerdate	branches, newest first
 reflog	reflog	where HEAD has been
 
-# --- staging ---
-a	add	stage one path
+# --- Staging ---
+a	add	stage one path	hint:Takes a path
 aa	add -A	stage everything
 ia	add --patch	stage hunk by hunk
-us	restore --staged	unstage a path
+us	restore --staged	unstage a path	hint:Takes a path
 cl	restore --source=HEAD --staged --worktree .	wipe tree and index
 cl-wd	restore --source=HEAD --worktree .	wipe the working tree
 cl-sa	restore --source=HEAD --staged	wipe the index
 
-# --- commit ---
-c|commit	commit	record the staged changes
+# --- Commit ---
+commit|c	commit	record the staged changes	hint:Use -m "msg"
 ca	commit -a	record every tracked change
-amend	fn:amend	fold staged changes into HEAD, or into a commit
-reword	fn:reword	edit the message of a commit
-split	fn:split	cut one commit in two
+amend	fn:amend	fold staged changes into HEAD, or into a commit	hint:Takes a handle
+reword|rename|describe|desc	fn:reword	edit the message of a commit	hint:Takes a handle
+split	fn:split	cut one commit in two	hint:Takes a handle, then -- paths
 empty	commit --allow-empty	record an empty commit
 absorb	absorb	fold changes into the right commit
-uncommit	fn:uncommit	move the last commits back into the tree
+uncommit	fn:uncommit	move the last commits back into the tree	hint:Takes a count
 hooks	fn:hooks	install the Change-Id hook
 
-# --- history ---
-move	fn:move	replay a commit onto another base
-abandon	fn:abandon	drop one commit, replay its descendants
-edit	fn:edit	stop a rebase at a commit
-squash	fn:squash	fold a commit into its parent
+# --- History ---
+move	fn:move	replay a commit onto another base	hint:Takes a handle
+abandon	fn:abandon	drop one commit, replay its descendants	hint:Takes a handle
+edit	fn:edit	stop a rebase at a commit	hint:Takes a handle
+squash	fn:squash	fold a commit into its parent	hint:Takes a handle
 continue	fn:continue	resume a stopped rebase
 abort	fn:abort	abort whatever operation is stuck
 
-# --- remote ---
-up|update	fn:update	fetch and rebase on the upstream
-pu|push	fn:push	push, refuse on drift
-sync	fn:sync	rebase on a branch, then push
+# --- Remote ---
+update|up	fn:update	fetch and rebase on the upstream
+push|pu	fn:push	push, refuse on drift
+sync	fn:sync	rebase on a branch, then push	hint:Takes a branch
 
-# --- branches ---
+# --- Branches ---
 br	branch	list branches
-sw	switch	change branch
-cbr	switch -c	create and switch
-dbr	branch -d	delete a merged branch
-mg	merge	merge a branch into this one
+sw	switch	change branch	hint:Takes a branch
+cbr	switch -c	create and switch	hint:Takes a branch
+dbr	branch -d	delete a merged branch	hint:Takes a branch
+mg	merge	merge a branch into this one	hint:Takes a branch
 arb	rebase --abort	abort the rebase
 amg	merge --abort	abort the merge
 
-# --- stash ---
+# --- Stash ---
 stasha	stash --include-untracked	stash tree and untracked files
 stashs	stash show --text	show the top stash
 
-# --- safety ---
-cp	cherry-pick	copy a commit here
-re	reset	move HEAD
-rs	restore	restore paths
+# --- Safety ---
+cp	cherry-pick	copy a commit here	hint:Takes a handle
+re	reset	move HEAD	hint:Takes a ref
+rs	restore	restore paths	hint:Takes a path
 
-# --- tools ---
+# --- Tools ---
 story	tool:gitlogue	animated history replay
 mzt	tool:git-machete	branch layout maintenance
-sim	tool:git-sim	render an operation before running it
+sim	tool:git-sim	render an operation before running
 wip	tool:git-wip	save or inspect work in progress
 wt	tool:wt	worktree management

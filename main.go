@@ -331,12 +331,15 @@ func help(argv []string) int {
 	}
 
 	for _, category := range order {
-		fmt.Println(ui.Dim(category))
+		fmt.Println(ui.Dim(category + ":"))
 		for _, e := range groups[category] {
 			if e.Hidden {
 				continue
 			}
 			line := fmt.Sprintf("  %s  %-*s", ui.Cyan(fmt.Sprintf("%-*s", nameWidth, e.Display())), descWidth, e.Description)
+			if e.Hint != "" {
+				line += "  " + ui.Dim(e.Hint)
+			}
 			if all {
 				if cmd := e.Command(); cmd != "" {
 					line += "  " + ui.Dim(cmd)
@@ -347,7 +350,7 @@ func help(argv []string) int {
 		fmt.Println()
 	}
 
-	fmt.Println(ui.Dim("meta"))
+	fmt.Println(ui.Dim("Meta:"))
 	meta := [][2]string{
 		{"raw", "run git with any arguments, still undoable"},
 		{"undo", "reset --soft to the previous snapshot"},

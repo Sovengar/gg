@@ -17,13 +17,14 @@ var registry string
 // binary, anything else runs git with Snippet + args.
 type Entry struct {
 	Name        string // canonical name, the first alias
-	Label       string // aliases as written in the registry, e.g. "c|commit"
+	Label       string // aliases as written in the registry, e.g. "commit|c"
 	Snippet     string
 	Description string
+	Hint        string // grey parameter note shown after the description
 	Category    string
 	Tool        string
 	Hidden      bool
-	Shown       string // name column override in help, e.g. st/sta/stf
+	Shown       string // name column override in help, e.g. status (st, sta, stf)
 	Fn          func(args []string) int
 }
 
@@ -65,7 +66,7 @@ var mutating = map[string]bool{
 	"move": true, "publish": true, "sync": true, "update": true, "undo": true,
 	"abandon": true, "cp": true, "push": true, "pu": true, "up": true, "wip": true,
 	"edit": true, "continue": true, "hooks": true, "abort": true,
-	"reword": true,
+	"reword": true, "rename": true, "describe": true, "desc": true,
 }
 
 var table = parse(registry)
@@ -83,7 +84,7 @@ func parse(src string) map[string]Entry {
 		}
 		name, rest, _ := strings.Cut(line, "\t")
 		snippet, tail, _ := strings.Cut(rest, "\t")
-		description, flags, _ := strings.Cut(tail, "\t")
+		description, fields, _ := strings.Cut(tail, "\t")
 		name = strings.TrimSpace(name)
 		snippet = strings.TrimSpace(snippet)
 		if name == "" {
@@ -98,12 +99,18 @@ func parse(src string) map[string]Entry {
 			Description: strings.TrimSpace(description),
 			Category:    category,
 		}
-		for _, tok := range strings.Fields(flags) {
-			switch {
-			case tok == "hidden":
+		for _, field := range strings.Split(fields, "\t") {
+			field = strings.TrimSpace(field)
+			if h, ok := strings.CutPrefix(field, "hint:"); ok {
+				entry.Hint = strings.TrimSpace(h)
+				continue
+			}
+			if d, ok := strings.CutPrefix(field, "display:"); ok {
+				entry.Shown = strings.TrimSpace(d)
+				continue
+			}
+			if field == "hidden" {
 				entry.Hidden = true
-			case strings.HasPrefix(tok, "display:"):
-				entry.Shown = strings.TrimPrefix(tok, "display:")
 			}
 		}
 		if fn, ok := strings.CutPrefix(snippet, "fn:"); ok {
@@ -179,13 +186,20 @@ func All() []Entry {
 }
 
 // Describe is the one-line help text for the verb.
-// Display is the name column in help, aliases joined with a slash, or the
-// explicit display: override when the registry sets one.
+// Display is the name column in help: the canonical name first, the shorter
+// variants in parentheses, or the explicit display: override when set.
 func (e Entry) Display() string {
 	if e.Shown != "" {
 		return e.Shown
 	}
-	return strings.ReplaceAll(e.Label, "|", "/")
+	aliases := strings.Split(e.Label, "|")
+	for i := range aliases {
+		aliases[i] = strings.TrimSpace(aliases[i])
+	}
+	if len(aliases) < 2 {
+		return aliases[0]
+	}
+	return aliases[0] + " (" + strings.Join(aliases[1:], ", ") + ")"
 }
 
 // Command is the git command behind the verb, empty when there is none to show.

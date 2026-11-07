@@ -21,7 +21,7 @@ GOROOT= ~/.local/share/mise/installs/go/1.27.3/bin/go build -o ~/.local/bin/gg .
 
 ```
 gg                 dashboard: branch, files, commits, branches
-gg st/sta/stf      Status, Status all or Status with files untracked
+gg status/st/sta/stf  Status, Status all or Status with files untracked
 gg stf             status including untracked
 gg log             short graph log, 6 commits by default, ✓ pushed / ↑ local
 gg log 20          more of it, extra args go to git log
@@ -34,7 +34,7 @@ gg aa              add -A
 gg c -m "msg"      commit
 gg amend           fold staged changes into HEAD
 gg amend <id>      fold staged changes into another commit (git history fixup)
-gg reword <id>     edit that commit's message (git history reword)
+gg reword <id>     edit that commit's message (aliases: rename, describe, desc)
 gg split <id> -- f cut that commit in two by paths (git history split, interactive)
 gg abandon <id>    drop that commit (git history drop)
 gg uncommit 2      move the last 2 commits back into the working copy
@@ -53,8 +53,11 @@ gg tools           external tools + install state
 
 Unknown verbs go straight to git: `gg log --oneline -5` runs `git log --oneline -5`.
 
-Help is grouped by action: inspect, staging, commit, history, remote, branches,
-stash, safety, tools. Aliases share one row: `c/commit`, `pu/push`, `up/update`.
+Help is grouped like `but --help`: Title Case categories with a colon —
+Inspection, Staging, Commit, History, Remote, Branches, Stash, Safety, Tools.
+The canonical name comes first, short variants in parentheses:
+`commit (c)`, `push (pu)`, `status (st, sta, stf)`, `reword (rename, describe, desc)`.
+Parameter notes print in grey after the description: `diff  diff the tree  Takes a path`.
 `gg help` shows the verb table only; `gg help -all` adds the git command behind
 each row.
 
