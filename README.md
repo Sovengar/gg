@@ -30,14 +30,20 @@ gg files           ls-files
 gg branches        branches sorted by recency
 gg reflog          reflog
 gg diff -w         diff ignoring whitespace
-gg aa              add -A
-gg c -m "msg"      commit
-gg amend           fold staged changes into HEAD
-gg amend <id>      fold staged changes into another commit (git history fixup)
+gg c -m "msg"      commit every dirty path (aliases: commit, ca)
+gg c -m "msg" kd qz  commit only those handles
+gg discard kd      drop that change, keep the rest (alias: rs)
+gg discard -a      drop everything
+gg new             start a wip commit that absorbs your edits
+gg amend           fold your edits into HEAD
+gg amend <id>      fold your edits into another commit (git history fixup)
 gg reword <id>     edit that commit's message (aliases: rename, describe, desc)
 gg split <id> -- f cut that commit in two by paths (git history split, interactive)
 gg abandon <id>    drop that commit (git history drop)
 gg uncommit 2      move the last 2 commits back into the working copy
+gg wt new side     a worktree for a branch, one directory each
+gg wt ls           each worktree, its path and how dirty it is
+gg wt rm side      remove it, --force when dirty
 gg absorb          git absorb
 gg update / gg up  fetch --prune --all + pull --rebase --autostash
 gg push / gg pu    push, refuse on drift, offer force-with-lease
@@ -67,6 +73,36 @@ each row.
 
 Flags: `-p/--print`, `-n/--dry` print the resolved command instead of running.
 Environment: `GG_ECHO=1` traces the git call, `NO_COLOR=1` disables colour.
+
+### Changes, not staging
+
+No verb asks you to stage. Every dirty path already carries a handle, so `gg c`
+takes handles and the index stays git's business:
+
+```
+gg dash            kd M docs/README.md, px ?? notes.md
+gg c -m "docs" kd  commit one path, leave px dirty
+gg discard px      drop a change, keep the rest
+gg new             or park everything in a wip commit on the branch
+```
+
+`gg discard` takes `-a` for the whole tree; `gg a` and `gg ia` still exist as
+hidden escape hatches until the handle model settles.
+
+### Work in progress and worktrees
+
+`gg new` turns the working tree into a commit on the current branch. While that
+commit is HEAD, `gg dash` prints a `wip` badge, every verb that rewinds history
+folds your edits into it first, and `gg push` refuses until you finalize with
+`gg c -m "msg"` or take it back with `gg uncommit`. There is no stash.
+
+Work that must not share a checkout goes to its own worktree:
+
+```
+gg wt new side     sibling directory <repo>.side on branch side
+gg wt ls           branch, path, and how dirty each worktree is
+gg wt rm side      remove it; --force when it is dirty
+```
 
 ### Handles
 
