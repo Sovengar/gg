@@ -88,7 +88,7 @@ func fileList(fidx *files.Index) {
 		return
 	}
 	fmt.Println()
-	fmt.Println(ui.Dim("files"))
+	fmt.Println(ui.Dim("Uncommitted files"))
 	for _, l := range lines {
 		if strings.HasPrefix(l, "## ") {
 			continue
@@ -129,6 +129,10 @@ func branchList(idx *ids.Index) {
 	if err != nil || len(lines) == 0 {
 		return
 	}
+	bidx, err := ids.LoadBranches()
+	if err != nil {
+		bidx = &ids.BranchIndex{}
+	}
 
 	// current branch first, then the rest in git order
 	var current, others []string
@@ -153,7 +157,7 @@ func branchList(idx *ids.Index) {
 		if len(parts) > 3 && parts[3] == "*" {
 			marker = "*"
 		}
-		line := fmt.Sprintf("  %s %s %-14s", marker, ui.Red(idx.Handle(sha)), name)
+		line := fmt.Sprintf("  %s %s %-14s", marker, ui.Red(bidx.Handle(name)), name)
 		switch {
 		case upstream == "":
 			line += ui.Dim("no upstream")
