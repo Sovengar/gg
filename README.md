@@ -46,7 +46,7 @@ gg sync            fails: the branch argument is required
 gg abort           abort whichever operation is stuck: rebase, merge, cherry-pick
 gg undo            reset --soft to the last snapshot
 gg raw log -5      anything goes, still snapshotted
-gg help            verb table
+gg help            verb table (alias: h)
 gg help -all       verb table + the git command behind each verb
 gg tools           external tools + install state
 ```
@@ -60,7 +60,7 @@ parentheses: `commit (c)`, `push (pu)`, `status (st, sta, stf)`,
 `reword (rename, describe, desc)`. Parameter notes print in grey after the
 description. Verbs that fit no group live in Others (hooks, re, cl, cl-wd,
 cl-sa, raw, id, tools).
-`gg help` shows the verb table only; `gg help -all` adds the git command behind
+`gg help` (or `gg h`) shows the verb table only; `gg help -all` adds the git command behind
 each row.
 
 Flags: `-p/--print`, `-n/--dry` print the resolved command instead of running.

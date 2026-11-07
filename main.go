@@ -46,7 +46,7 @@ func run(argv []string) int {
 	}
 
 	switch args[0] {
-	case "help":
+	case "help", "h":
 		return help(args[1:])
 	case "version":
 		fmt.Println("gg " + version)
