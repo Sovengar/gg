@@ -110,6 +110,17 @@ func MarkWip() { _, _ = Output("update-ref", WipRef, "HEAD") }
 // DropWip deletes the marker.
 func DropWip() { _, _ = Output("update-ref", "-d", WipRef) }
 
+// ClearStaleWip drops the marker when HEAD is no longer the wip commit.
+func ClearStaleWip() {
+	sha, ok := WipSha()
+	if !ok {
+		return
+	}
+	if head, ok := Head(); !ok || head != sha {
+		DropWip()
+	}
+}
+
 // Dirty reports whether the working tree has changes.
 func Dirty() bool {
 	out, err := Output("status", "--porcelain")

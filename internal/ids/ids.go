@@ -1,11 +1,11 @@
-// Package ids gives commits a short handle that survives history rewrites.
+// Package ids gives commits a short changeId that survives history rewrites.
 //
-// The handle comes from the commit's Change-Id trailer when present, so an
-// amend, a rebase or a squash keeps the same handle. Commits without that
-// trailer fall back to a handle derived from their sha, which does change when
+// The changeId comes from the commit's Change-Id trailer when present, so an
+// amend, a rebase or a squash keeps the same changeId. Commits without that
+// trailer fall back to a changeId derived from their sha, which does change when
 // the commit is rewritten.
 //
-// Handles are the shortest unique prefix, never shorter than two characters.
+// changeIds are the shortest unique prefix, never shorter than two characters.
 package ids
 
 import (
@@ -20,17 +20,17 @@ import (
 // alphabet avoids characters that are easy to confuse when typed.
 const alphabet = "abcdefghijkmnpqrstuvwxyz23456789"
 
-// MinLen and MaxLen bound a handle.
+// MinLen and MaxLen bound a changeId.
 const (
 	MinLen = 2
 	MaxLen = 4
 )
 
-// Index maps handles to commits for the current repository.
+// Index maps changeIDs to commits for the current repository.
 type Index struct {
-	handles map[string]string   // sha -> handle
-	byToken map[string]string   // token -> sha, only unique prefixes
-	ambig   map[string][]string // token -> shas, when not unique
+	changeIDs map[string]string   // sha -> changeId
+	byToken   map[string]string   // token -> sha, only unique prefixes
+	ambig     map[string][]string // token -> shas, when not unique
 }
 
 // Load scans the history once and builds the index.
@@ -59,35 +59,19 @@ func Load() (*Index, error) {
 			continue
 		}
 		seen[key] = true
-		raws[sha] = Raw(key)
+		raws[sha] = RawChangeID(key)
 	}
 
-	// count how many commits share each prefix, so handles stay unique
-	owners := make(map[string]map[string]bool)
-	for sha, raw := range raws {
-		for n := MinLen; n <= MaxLen; n++ {
-			p := raw[:n]
-			if owners[p] == nil {
-				owners[p] = make(map[string]bool)
-			}
-			owners[p][sha] = true
-		}
-	}
+	// count how many commits share each prefix, so changeIDs stay unique
+	owners := prefixOwners(raws)
 
 	ix := &Index{
-		handles: make(map[string]string, len(raws)),
-		byToken: make(map[string]string, len(owners)),
-		ambig:   make(map[string][]string),
+		changeIDs: make(map[string]string, len(raws)),
+		byToken:   make(map[string]string, len(owners)),
+		ambig:     make(map[string][]string),
 	}
 	for sha, raw := range raws {
-		handle := raw
-		for n := MinLen; n <= MaxLen; n++ {
-			if len(owners[raw[:n]]) == 1 {
-				handle = raw[:n]
-				break
-			}
-		}
-		ix.handles[sha] = handle
+		ix.changeIDs[sha] = shortestChangeID(owners, raw)
 	}
 	for token, shas := range owners {
 		if len(shas) == 1 {
@@ -104,7 +88,7 @@ func Load() (*Index, error) {
 }
 
 // Raw hashes an identity key into alphabet characters.
-func Raw(key string) string {
+func RawChangeID(key string) string {
 	sum := sha256.Sum256([]byte(key))
 	var b strings.Builder
 	for i := 0; i < MaxLen; i++ {
@@ -113,21 +97,21 @@ func Raw(key string) string {
 	return b.String()
 }
 
-// Handle returns the handle for a sha, or a sha-derived one when the commit is
+// ChangeID returns the changeId for a sha, or a sha-derived one when the commit is
 // not in the index.
-func (ix *Index) Handle(sha string) string {
-	if h, ok := ix.handles[sha]; ok {
+func (ix *Index) ChangeID(sha string) string {
+	if h, ok := ix.changeIDs[sha]; ok {
 		return h
 	}
-	return Raw("sha:" + strings.ToLower(sha))
+	return RawChangeID("sha:" + strings.ToLower(sha))
 }
 
-// Short returns the handle and the abbreviated sha, for display.
+// Short returns the changeId and the abbreviated sha, for display.
 func (ix *Index) Short(sha string) string {
 	if len(sha) < 7 {
-		return ix.Handle(sha) + " " + sha
+		return ix.ChangeID(sha) + " " + sha
 	}
-	return ix.Handle(sha) + " " + sha[:7]
+	return ix.ChangeID(sha) + " " + sha[:7]
 }
 
 // Ref is the result of resolving a token.
@@ -156,17 +140,17 @@ func (ix *Index) Resolve(token string) (Ref, Status) {
 	}
 	if shas, ok := ix.ambig[token]; ok {
 		sort.Strings(shas)
-		var handles []string
+		var changeIDs []string
 		for _, sha := range shas {
-			handles = append(handles, ix.Handle(sha))
+			changeIDs = append(changeIDs, ix.ChangeID(sha))
 		}
-		ui.Errf("gg: %s is ambiguous: %s", token, strings.Join(handles, " "))
+		ui.Errf("gg: %s is ambiguous: %s", token, strings.Join(changeIDs, " "))
 		return Ref{}, Ambiguous
 	}
 	return Ref{}, Unknown
 }
 
-// Shaped reports whether a token could be a handle.
+// Shaped reports whether a token could be a changeId.
 func Shaped(token string) bool {
 	if len(token) < MinLen || len(token) > MaxLen {
 		return false

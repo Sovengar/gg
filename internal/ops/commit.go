@@ -39,7 +39,8 @@ func finalizeWip(flags, paths []string) int {
 		return 1
 	}
 	if !hasMessage(flags) {
-		flags = append(flags, "--no-edit")
+		ui.Errf("gg c: a wip commit needs a message. Use gg c -m \"msg\", or gg uncommit to take it back.")
+		return 2
 	}
 	if rc := gitx.Run("add", "-A"); rc != 0 {
 		return rc
@@ -98,28 +99,25 @@ func tracked(path string) bool {
 	return err == nil
 }
 
-// Discard drops the named changes: tracked paths go back to HEAD, untracked
-// files are deleted. It is the but verb of the same name.
+// Discard drops edits to tracked files, and keeps new files: nothing in a
+// commit holds them, so deleting one is not a discard. It is the but verb of
+// the same name; `gg clear` owns the new files.
 func Discard(args []string) int {
 	var paths []string
-	all := false
 	for _, a := range args {
 		switch a {
 		case "-a", "--all":
-			all = true
+			ui.Errf("gg discard: no -a. A bare discard drops every edit already.")
+			return 2
+		case "-f", "--force":
+			ui.Errf("gg discard: -f deletes nothing here. Use gg clear.")
+			return 2
 		default:
 			paths = append(paths, a)
 		}
 	}
-	if all {
-		if rc := gitx.Run("restore", "--source=HEAD", "--staged", "--worktree", "."); rc != 0 {
-			return rc
-		}
-		return gitx.Run("clean", "-f", "-d")
-	}
 	if len(paths) == 0 {
-		ui.Errf("gg discard: name a path or a handle. Use -a to drop all changes.")
-		return 2
+		return gitx.Run("reset", "--hard", "--quiet")
 	}
 
 	var known, fresh []string
@@ -130,16 +128,64 @@ func Discard(args []string) int {
 		}
 		fresh = append(fresh, p)
 	}
-	if len(known) > 0 {
-		argv := append([]string{"restore", "--source=HEAD", "--staged", "--worktree", "--"}, known...)
-		if rc := gitx.Run(argv...); rc != 0 {
-			return rc
-		}
-	}
 	if len(fresh) > 0 {
-		if rc := gitx.Run(append([]string{"clean", "-f", "-d", "--"}, fresh...)...); rc != 0 {
-			return rc
+		ui.Errf("gg discard: %d path(s) are new, so no change is there to drop:", len(fresh))
+		for _, p := range fresh {
+			ui.Errf("    %s", p)
+		}
+		ui.Errf("gg discard: nothing touched. gg clear deletes new files.")
+		return 1
+	}
+	argv := append([]string{"restore", "--source=HEAD", "--staged", "--worktree", "--"}, known...)
+	return gitx.Run(argv...)
+}
+
+// Clear drops every edit and deletes the new files, so the tree matches HEAD.
+// No commit holds a new file, so git cannot bring one back: it asks first,
+// and -f skips the question.
+func Clear(args []string) int {
+	force := false
+	for _, a := range args {
+		switch a {
+		case "-f", "--force":
+			force = true
+		case "-a", "--all":
+			ui.Errf("gg clear: no -a. It already means everything.")
+			return 2
+		default:
+			ui.Errf("gg clear: it takes no path and no changeId, only -f to skip the prompt")
+			return 2
 		}
 	}
-	return 0
+	fresh := untracked()
+	if len(fresh) > 0 && !force && !confirmClear(fresh) {
+		return 1
+	}
+	if rc := gitx.Run("reset", "--hard", "--quiet"); rc != 0 {
+		return rc
+	}
+	return gitx.Run("clean", "-f", "-d")
+}
+
+// untracked lists the new files git would delete, one per line.
+func untracked() []string {
+	out, err := gitx.Output("ls-files", "--others", "--exclude-standard")
+	if err != nil {
+		return nil
+	}
+	return strings.Fields(out)
+}
+
+// confirmClear asks before deleting new paths, which no commit holds.
+func confirmClear(paths []string) bool {
+	ui.Errf("gg clear: %d new path(s) would be deleted, and git cannot restore them:", len(paths))
+	for _, p := range paths {
+		ui.Errf("    %s", p)
+	}
+	choice, ok := ui.Prompt("gg clear: delete them? [y/N] > ")
+	if !ok {
+		ui.Errf("gg clear: nothing deleted. Pass -f to drop new paths.")
+		return false
+	}
+	return choice == "y" || choice == "yes"
 }

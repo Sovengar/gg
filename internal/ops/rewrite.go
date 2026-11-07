@@ -22,6 +22,24 @@ func Move(args []string) int {
 	return gitx.Run("rebase", "--autostash", "--onto", onto, what+"^")
 }
 
+// Revert undoes one commit with a new commit on top. It is the only undo that
+// is safe on published history, because it never rewrites: the original commit
+// stays reachable. A merge commit needs -m N, which git asks for itself.
+func Revert(args []string) int {
+	if len(args) == 0 {
+		ui.Errf("gg revert: name a commit.")
+		return 2
+	}
+	if wipGuard() {
+		return 1
+	}
+	if inSequence() {
+		ui.Errf("gg revert: git is mid-operation. Run gg continue or gg abort first.")
+		return 1
+	}
+	return gitx.Run(append([]string{"revert", "--no-edit"}, args...)...)
+}
+
 // Abandon drops one commit and replays its descendants on its parent.
 func Abandon(args []string) int {
 	if len(args) < 1 {
@@ -241,7 +259,7 @@ func sameCommit(a, b string) bool {
 	return n > 0 && a[:n] == b[:n]
 }
 
-const hookMarker = "# gg: keep a stable Change-Id so handles survive rewrites"
+const hookMarker = "# gg: keep a stable Change-Id so changeIDs survive rewrites"
 
 const hookScript = `#!/bin/sh
 ` + hookMarker + `
@@ -251,7 +269,7 @@ printf '\nChange-Id: I%s\n' "$(od -An -tx1 -N20 /dev/urandom | tr -d ' \n')" >> 
 `
 
 // InstallHooks writes the commit-msg hook that gives every new commit a
-// Change-Id trailer, which is what makes handles stable across rewrites.
+// Change-Id trailer, which is what makes changeIDs stable across rewrites.
 func InstallHooks(args []string) int {
 	if !gitx.InRepo() {
 		ui.Errf("gg: not inside a git repository")

@@ -118,6 +118,7 @@ func ask(up string, args []string) int {
 // commit goes, and its descendants are replayed on top. With no argument it
 // uncommits HEAD, the way but does.
 func Uncommit(args []string) int {
+	defer gitx.ClearStaleWip()
 	if len(args) == 0 {
 		return uncommitHead()
 	}
@@ -145,7 +146,7 @@ func uncommitHead() int {
 func uncommitOne(arg string) int {
 	sha, err := gitx.Output("rev-parse", "--verify", "--quiet", arg+"^{commit}")
 	if err != nil {
-		ui.Errf("gg uncommit: %s is not a commit any more; rerun with a fresh handle", arg)
+		ui.Errf("gg uncommit: %s is not a commit any more; rerun with a fresh changeId", arg)
 		return 1
 	}
 	head, err := gitx.Output("rev-parse", "HEAD")

@@ -9,6 +9,7 @@ import (
 	"gg/internal/gitx"
 	"gg/internal/hist"
 	"gg/internal/ids"
+	"gg/internal/ops"
 	"gg/internal/ui"
 )
 
@@ -43,6 +44,7 @@ func Run(args []string) int {
 	fileList(fidx)
 	commitList(commits)
 	branchList(idx)
+	worktreeList()
 	return 0
 }
 
@@ -73,7 +75,7 @@ func header(idx *ids.Index, sha string) {
 
 	line := fmt.Sprintf("%s  %s %s  %s %s",
 		ui.Cyan(branch),
-		ui.Red(idx.Handle(sha)), ui.Dim(sha[:7]),
+		ui.Red(idx.ChangeID(sha)), ui.Dim(sha[:7]),
 		ui.Green("↑"+ahead), ui.Yellow("↓"+behind))
 	if gitx.InWip() {
 		line += "  " + ui.Magenta("wip")
@@ -94,8 +96,8 @@ func fileList(fidx *files.Index) {
 			continue
 		}
 		code, path := l[:2], strings.TrimSpace(l[3:])
-		handle := ui.Red(fmt.Sprintf("%-2s", fidx.Handle(path)))
-		fmt.Printf("  %s %s %s\n", handle, paint(code), path)
+		changeId := ui.Red(fmt.Sprintf("%-2s", fidx.ChangeID(path)))
+		fmt.Printf("  %s %s %s\n", changeId, paint(code), path)
 	}
 }
 
@@ -109,6 +111,19 @@ func paint(line string) string {
 		return ui.Dim(code) + rest
 	}
 	return ui.Cyan(code) + rest
+}
+
+// worktreeList prints the other worktrees, so parallel branches are visible.
+func worktreeList() {
+	lines := ops.WorktreeLines()
+	if len(lines) == 0 {
+		return
+	}
+	fmt.Println()
+	fmt.Println(ui.Dim("worktrees"))
+	for _, l := range lines {
+		fmt.Println("  " + l)
+	}
 }
 
 func commitList(n int) {
@@ -157,7 +172,7 @@ func branchList(idx *ids.Index) {
 		if len(parts) > 3 && parts[3] == "*" {
 			marker = "*"
 		}
-		line := fmt.Sprintf("  %s %s %-14s", marker, ui.Red(bidx.Handle(name)), name)
+		line := fmt.Sprintf("  %s %s %-14s", marker, ui.Red(bidx.ChangeID(name)), name)
 		switch {
 		case upstream == "":
 			line += ui.Dim("no upstream")

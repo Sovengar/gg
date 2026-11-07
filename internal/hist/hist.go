@@ -54,6 +54,32 @@ func Run(args []string) int {
 	return page(append(gitArgs, "--color=always"), r)
 }
 
+// BranchLines renders one lane of the dashboard: the commits of tip that base
+// does not reach, newest first. Every row is already prefixed with its ball.
+func BranchLines(tip, base string, n int) []string {
+	if tip == "" {
+		return nil
+	}
+	r := newRenderer(false)
+	spec := tip
+	if base != "" {
+		spec = base + ".." + tip
+	}
+	out, err := gitx.OutputAll("log", "--format="+record, "-n", strconv.Itoa(n), spec)
+	if err != nil {
+		return nil
+	}
+	lines := make([]string, 0, len(out))
+	for _, raw := range out {
+		fields := strings.Split(strings.TrimRight(raw, "\r"), "\x1f")
+		if len(fields) < 8 {
+			continue
+		}
+		lines = append(lines, r.ball(fields[0])+" "+r.tail(fields))
+	}
+	return lines
+}
+
 // Block returns the same lines Run prints, for callers that compose them.
 func Block(n int, long bool, extras ...string) []string {
 	r := newRenderer(long)
@@ -192,7 +218,7 @@ var ansi = regexp.MustCompile("\\x1b\\[[0-9;]*m")
 
 // line turns one git line into a gg line:
 //
-//	<graph> <handle> <sha> <age> <subject> <decorations> [author]
+//	<graph> <changeId> <sha> <age> <subject> <decorations> [author]
 func (r *renderer) line(raw string) string {
 	raw = strings.TrimRight(raw, "\r")
 	raw = ansi.ReplaceAllString(raw, "")
@@ -205,13 +231,22 @@ func (r *renderer) line(raw string) string {
 	if len(fields) < 8 {
 		return raw
 	}
+
+	return strings.TrimRight(graph(raw[:start], r.ball(fields[0])), " ") + " " + r.tail(fields)
+}
+
+// ball is the commit dot, green when a remote already has the commit.
+func (r *renderer) ball(sha string) string {
+	if r.pushed[sha] {
+		return ui.BrightGreen("●")
+	}
+	return ui.BrightMagenta("●")
+}
+
+// tail is the row after the ball: changeId, sha, age, subject and decorations.
+func (r *renderer) tail(fields []string) string {
 	sha, short, epoch, deco, subject, author, sig := fields[0], fields[1], fields[2], fields[3], fields[4], fields[5], fields[6]
 	parents := fields[7]
-
-	ball := ui.BrightMagenta("●")
-	if r.pushed[sha] {
-		ball = ui.BrightGreen("●")
-	}
 
 	shown := short
 	if r.long {
@@ -219,9 +254,7 @@ func (r *renderer) line(raw string) string {
 	}
 
 	var b strings.Builder
-	b.WriteString(strings.TrimRight(graph(raw[:start], ball), " "))
-	b.WriteString(" ")
-	b.WriteString(ui.Red(r.idx.Handle(sha)))
+	b.WriteString(ui.Red(r.idx.ChangeID(sha)))
 	b.WriteString(" ")
 	b.WriteString(ui.Dim(shown))
 	b.WriteString(" ")

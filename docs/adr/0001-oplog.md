@@ -47,7 +47,7 @@ An entry is built with `git commit-tree`:
 
 The committer identity is the marker `gg oplog <gg-oplog@localhost>`. `p1` and `p2` use this marker to tell an entry from a normal commit.
 
-The worktree snapshot uses a temporary index at `<git-dir>/gg-tmp-index`. The steps are `read-tree HEAD`, `add -A`, `write-tree`. The temporary index is removed after use. The real index and HEAD are not touched while recording. When the repository has no HEAD yet, the base is the empty tree from `git mktree`.
+The worktree snapshot uses a temporary index at `<git-dir>/gg-tmp-index-<pid>-<counter>`. The name is unique per process and run, so two `gg` processes in one repository cannot clobber each other. The steps are `read-tree HEAD`, `add -A`, `write-tree`. The temporary index is removed after use. The real index and HEAD are not touched while recording. When the repository has no HEAD yet, the base is the empty tree from `git mktree`.
 
 `Record(verb)` runs before every verb in the mutating set. The set is gated by `verbs.IsMutating`. The call sites are `execArgv` and `execFunc` in `main.go`, and also `execTool`. `Record` returns early when the current directory is not inside a repository.
 
@@ -55,20 +55,23 @@ The chain grows by one commit per recorded verb. Entries are ordinary commit obj
 
 `undo` and `redo` are not in the mutating set. They change the refs and the worktree directly.
 
-`gg oplog` lists `cur` and its ancestors, newest first. Each line has the short sha, the relative age and the verb. `cur` and `tip` can differ after an undo: `tip` stays on the newest entry, `cur` moves back to the restored one. The list follows `cur`, so the entries after it are not shown.
+`gg oplog` lists `cur` and its ancestors, newest first. Each line has the short sha, the relative age and the verb. `cur` and `tip` can differ after an undo: `tip` stays on the newest entry, `cur` moves back to the restored one. The list follows `cur`, so the entries after it are not shown. An empty log prints `no operations yet` and exits 0.
+
+`gg oplog clear` deletes `tip`, `cur` and `redo` and prints the `git gc --prune=now` hint. The objects stay in `.git` until git collects them. Clearing the refs does not remove the objects by itself.
 
 `gg undo [N]` works in this order:
 
 1. Snapshot the current state. Do this only when it differs from `cur`. This records an extra `undo` entry when the worktree is dirty.
 2. Find the Nth ancestor of `cur`.
-3. Restore it with `git reset --hard <P2>` and then `git read-tree -u --reset <entry>`.
-4. Point `cur` at the restored entry and `redo` at the old tip.
+3. Refuse when the current branch has an upstream and the target P2 is not an ancestor of the upstream tip. The message names the branch and asks for `--force` or `-f`, which bypasses the guard. A target without P2 is never guarded.
+4. Restore it with `git reset --hard <P2>`, then `git read-tree -u --reset <entry>`, then `git reset --quiet` so restored files are unstaged and new files are untracked.
+5. Point `cur` at the restored entry and `redo` at the old tip.
 
 When the worktree already matches `cur`, the newest entry is not a step. `undo N` then moves N entries back from `cur`. The relative age uses compact units: `5m`, `2h`, `10d`, `3w`.
 
-`gg redo` restores the entry stored in `refs/gg/oplog/redo` and clears that ref. The ref holds one sha, so redo moves forward one step, not a stack of steps. A new `Record` clears the ref as well.
+`gg redo` reads the entry stored in `refs/gg/oplog/redo`. When the worktree or HEAD differs from that target, it records the current state first, then restores the target and points `cur` at it. A following undo therefore returns edits made after the undo. Redo then clears the ref. The ref holds one sha, so redo moves forward one step, not a stack of steps. A new `Record` clears the ref as well.
 
-`trim()` keeps the log bounded. When the chain grows past 100 entries, it rebuilds the newest 100. Each rebuilt entry keeps the same tree, P2, message and original committer date. `tip` and `cur` move to the rebuilt chain. `undo` refuses a count larger than the chain and exits 1.
+`trim()` keeps the log bounded. When the chain grows past 100 entries, it rebuilds the newest 100. Each rebuilt entry keeps the same tree, P2, message and original committer date. `tip` and `cur` move to the rebuilt chain. If the redo ref is set and is not an ancestor of the new `cur`, `trim` clears it. `undo` refuses a count larger than the chain and exits 1.
 
 The snapshot includes untracked files. Therefore `gg discard` and every other mutating verb is revertible with `gg undo`. No stash and no extra commit are needed for that.
 
@@ -86,6 +89,8 @@ The snapshot includes untracked files. Therefore `gg discard` and every other mu
 - The real index and HEAD are untouched while recording. A failed snapshot does not corrupt the repository.
 - The marker identity keeps entries separate from normal commits. `p1` and `p2` stay unambiguous.
 - `redo` is explicit. A new snapshot drops the redo target, so the user cannot redo into a stale state.
+- `redo` records the state it replaces, so edits made after an undo are not lost.
+- `gg oplog clear` gives the user a direct way to drop the oplog refs before `git gc`.
 
 ### Bad
 
@@ -96,18 +101,18 @@ The snapshot includes untracked files. Therefore `gg discard` and every other mu
 - After the log reaches 100 entries, every `Record` rebuilds the whole chain: 100 `commit-tree` calls per mutating verb.
 - The log is not a durable backup. It is local state under `refs/gg/` and it is not pushed.
 - `Record` runs before the verb validates its input. A verb that fails still writes an entry, and that entry can block or shift `undo`.
-- `undo` and `redo` are not in the mutating set. Only `undo` records a snapshot, and only when the worktree differs. `redo` records nothing.
+- `undo` and `redo` are not in the mutating set. `undo` records a snapshot when the worktree differs from `cur`; `redo` records one when the worktree differs from its target.
 
 ### Risks and known gaps
 
-1. **HIGH — `redo` destroys local edits.** `Redo` calls `restore` without recording the current state. Uncommitted tracked edits made between `undo` and `redo` are lost silently. Reproduced: run `undo`, then `echo EDITED >> base.txt`, then `gg redo`; `base.txt` comes back without `EDITED`.
-2. **MEDIUM — restored changes are left staged.** `undo` and `redo` restore with `read-tree -u`, so files appear staged (`A a.txt`). This contradicts the contract that the index is never a user surface. Reproduced: after `undo`, `git status --short` shows `A  second.txt`.
-3. **MEDIUM — secret exposure.** Every untracked, non-ignored file is written into git objects, and it stays reachable from the oplog ref. A discarded secret survives in `.git` until `trim` drops the entry and `git gc` prunes it. Reproduced: a discarded secret file is still in the tree of `refs/gg/oplog/cur`.
-4. **MEDIUM — an undo can remove published commits.** Restore runs `reset --hard`, so the current branch ref moves backwards. Commits that were pushed can disappear from the branch. There is no guard like the one `push` uses. Reproduced: after `undo`, `git rev-list --count HEAD` fell from 2 to 1.
-5. **LOW — ignored files are not captured.** Files matched by `.gitignore` are not in the snapshot and cannot be restored. Reproduced with `*.secret`.
-6. **LOW — the temporary index path is fixed.** Two `gg` processes in the same repository can clobber each other's snapshot. Evidence: `snapshotTree` always uses `<git-dir>/gg-tmp-index`.
-7. **LOW — an empty log is an error.** `gg oplog` with no entries prints `gg: no operations recorded` and exits 1. Reproduced in a fresh repository.
-8. **LOW — `trim` does not move the redo ref.** A redo target can fall outside the rebuilt chain. Evidence: `trim` sets `tip` and `cur` only.
+1. **HIGH — `redo` destroys local edits. Fixed.** `Redo` reads the target, records the current state when it differs, then restores the target. A following `undo` returns the edit. Reproduced: `undo`, `echo EDITED >> base.txt`, `gg redo`, then `gg undo`; `base.txt` has `EDITED` again.
+2. **MEDIUM — restored changes are left staged. Fixed.** `restore` now runs `git reset --quiet` after `read-tree`. After `undo`, modified tracked files show as ` M` and files new to the entry show as `??`. The contents still match the entry tree.
+3. **MEDIUM — secret exposure. Mitigated, residual risk accepted.** Every untracked, non-ignored file is written into git objects and stays reachable from the oplog refs. `gg oplog clear` deletes the refs, but the objects remain in `.git` until `git gc --prune=now` collects them. Until then a discarded secret is still recoverable. Avoiding that would mean not writing untracked files into objects; the snapshot needs them.
+4. **MEDIUM — an undo can remove published commits. Fixed.** Before restoring, `undo` refuses when the current branch has an upstream and the target P2 is not an ancestor of the upstream tip. The message names the branch and asks for `--force` or `-f`. A target without P2 is not guarded.
+5. **LOW — ignored files are not captured. Accepted limitation.** Files matched by `.gitignore` are not in the snapshot and cannot be restored. Reproduced with `*.secret`. The worktree snapshot is git's tracked and untracked set, not ignored files.
+6. **LOW — the temporary index path is fixed. Fixed.** `snapshotTree` names the index `<git-dir>/gg-tmp-index-<pid>-<counter>`, unique per process and run, and still removes it in a `defer`.
+7. **LOW — an empty log is an error. Fixed.** `gg oplog` with no entries prints `no operations yet` on stdout and exits 0.
+8. **LOW — `trim` does not move the redo ref. Fixed.** After rebuilding the chain, `trim` clears the redo ref when it is set and is not an ancestor of the new `cur`.
 
 ### Alternatives considered
 

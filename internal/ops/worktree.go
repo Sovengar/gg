@@ -39,6 +39,43 @@ func worktreeUsage() int {
 	return 2
 }
 
+// WorktreeLines describes each worktree for the dashboard: the branch, the
+// path and how dirty it is, the current one marked with "*". It returns
+// nothing when the repository has a single worktree, where the view adds noise.
+func WorktreeLines() []string {
+	all := worktrees()
+	if len(all) < 2 {
+		return nil
+	}
+	root, _ := repoRoot()
+	out := make([]string, 0, len(all))
+	for _, w := range all {
+		marker := " "
+		if w.path == root {
+			marker = "*"
+		}
+		state := "clean"
+		if n := dirty(w.path); n > 0 {
+			state = strconv.Itoa(n) + " dirty"
+		}
+		out = append(out, fmt.Sprintf("%s %-14s %s  %s", marker, worktreeName(w), w.path, state))
+	}
+	return out
+}
+
+// WorktreeBranches lists the branches a worktree holds, so the dashboard can
+// draw one lane per parallel branch. The main worktree is included; callers
+// skip the branch they are already on.
+func WorktreeBranches() []string {
+	var out []string
+	for _, w := range worktrees() {
+		if w.branch != "" {
+			out = append(out, w.branch)
+		}
+	}
+	return out
+}
+
 // repoRoot returns the top level of the current work tree.
 func repoRoot() (string, bool) {
 	root, err := gitx.Output("rev-parse", "--show-toplevel")
@@ -58,6 +95,8 @@ func worktreeNew(args []string) int {
 	if len(args) < 1 {
 		return worktreeUsage()
 	}
+	// fold a wip commit first: the new worktree must not start on top of it
+	WipAmend()
 	branch := args[0]
 	base := "HEAD"
 	if len(args) > 1 {
@@ -76,6 +115,10 @@ func worktreeNew(args []string) int {
 
 	gitArgs := []string{"worktree", "add"}
 	if _, err := gitx.Output("show-ref", "--verify", "--quiet", "refs/heads/"+branch); err == nil {
+		if w, busy := findWorktree(worktrees(), branch); busy {
+			ui.Errf("gg wt new: branch %s is checked out in %s", branch, w.path)
+			return 1
+		}
 		gitArgs = append(gitArgs, path, branch)
 	} else {
 		gitArgs = append(gitArgs, "-b", branch, path, base)
@@ -174,6 +217,10 @@ func worktreeRemove(args []string) int {
 	target, ok := findWorktree(all, name)
 	if !ok {
 		ui.Errf("gg wt rm: no worktree named %q", name)
+		return 1
+	}
+	if len(all) > 0 && target.path == all[0].path {
+		ui.Errf("gg wt rm: %s is the main worktree. Run git worktree remove from another directory.", target.path)
 		return 1
 	}
 	if n := dirty(target.path); n > 0 && !force {

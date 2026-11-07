@@ -12,7 +12,7 @@ import (
 // back, so the working branch stays the one you were on.
 func Copy(args []string) int {
 	if len(args) == 0 || strings.HasPrefix(args[0], "-") {
-		ui.Errf("gg copy <handle>: name the commit to copy")
+		ui.Errf("gg copy <changeId>: name the commit to copy")
 		return 2
 	}
 	commit := args[0]

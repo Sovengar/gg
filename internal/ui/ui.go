@@ -101,7 +101,7 @@ const (
 	ansiBMag   = "\x1b[95m"
 )
 
-// Red is used for the short commit handles, so they stand out.
+// Red is used for the short commit changeIDs, so they stand out.
 func Red(s string) string { return Paint(ansiRed, s) }
 
 // BrightGreen marks a commit that lives on a remote.

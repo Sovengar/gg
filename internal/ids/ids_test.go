@@ -8,8 +8,8 @@ import (
 const sha = "641682b7a6c27c7273086ea06574b451742d5792"
 
 func TestRawIsStable(t *testing.T) {
-	first := Raw("Change-Id: I1234")
-	if first != Raw("Change-Id: I1234") {
+	first := RawChangeID("Change-Id: I1234")
+	if first != RawChangeID("Change-Id: I1234") {
 		t.Fatal("raw identity must be stable")
 	}
 	if len(first) != MaxLen {
@@ -20,8 +20,8 @@ func TestRawIsStable(t *testing.T) {
 			t.Fatalf("raw %q contains %q outside the alphabet", first, r)
 		}
 	}
-	if Raw("Change-Id: I1234") == Raw("Change-Id: I5678") {
-		t.Fatal("different identities produced the same raw handle")
+	if RawChangeID("Change-Id: I1234") == RawChangeID("Change-Id: I5678") {
+		t.Fatal("different identities produced the same raw changeId")
 	}
 }
 
@@ -30,21 +30,21 @@ func TestShaped(t *testing.T) {
 	bad := []string{"a", "abcde", "AB", "a-b", "@@", "a1"}
 	for _, g := range good {
 		if !Shaped(g) {
-			t.Errorf("%q should be shaped like a handle", g)
+			t.Errorf("%q should be shaped like a changeId", g)
 		}
 	}
 	for _, b := range bad {
 		if Shaped(b) {
-			t.Errorf("%q should not be shaped like a handle", b)
+			t.Errorf("%q should not be shaped like a changeId", b)
 		}
 	}
 }
 
-func TestHandleFallsBackToSHA(t *testing.T) {
+func TestChangeIDFallsBackToSHA(t *testing.T) {
 	ix := &Index{}
-	got := ix.Handle(sha)
+	got := ix.ChangeID(sha)
 	if len(got) < MinLen || len(got) > MaxLen {
-		t.Fatalf("handle = %q, want %d..%d chars", got, MinLen, MaxLen)
+		t.Fatalf("changeId = %q, want %d..%d chars", got, MinLen, MaxLen)
 	}
 	if !strings.Contains(ix.Short(sha), sha[:7]) {
 		t.Errorf("Short = %q, want the abbreviated sha", ix.Short(sha))

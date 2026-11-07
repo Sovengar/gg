@@ -45,48 +45,63 @@ func (e Entry) Argv(rest []string) []string {
 }
 
 var functions = map[string]func([]string) int{
-	"log":      hist.Run,
-	"reword":   ops.Reword,
-	"split":    ops.Split,
-	"amend":    ops.Amend,
-	"dash":     dash.Run,
-	"push":     ops.Push,
-	"update":   ops.Update,
-	"sync":     ops.Sync,
-	"uncommit": ops.Uncommit,
-	"move":     ops.Move,
-	"abandon":  ops.Abandon,
-	"edit":     ops.Edit,
-	"squash":   ops.Squash,
-	"continue": ops.Continue,
-	"abort":    ops.Abort,
-	"hooks":    ops.InstallHooks,
-	"wt":       ops.Worktree,
-	"new":      ops.New,
-	"commit":   ops.Commit,
-	"discard":  ops.Discard,
-	"copy":     ops.Copy,
-	"undo":     undo,
-	"redo":     redo,
-	"oplog":    oplogList,
+	"log":          hist.Run,
+	"reword":       ops.Reword,
+	"split":        ops.Split,
+	"amend":        ops.Amend,
+	"dash":         dash.Run,
+	"branches":     ops.Branches,
+	"deleteBranch": ops.DeleteBranch,
+	"push":         ops.Push,
+	"update":       ops.Update,
+	"sync":         ops.Sync,
+	"uncommit":     ops.Uncommit,
+	"move":         ops.Move,
+	"abandon":      ops.Abandon,
+	"revert":       ops.Revert,
+	"edit":         ops.Edit,
+	"squash":       ops.Squash,
+	"continue":     ops.Continue,
+	"abort":        ops.Abort,
+	"hooks":        ops.InstallHooks,
+	"wt":           ops.Worktree,
+	"new":          ops.New,
+	"commit":       ops.Commit,
+	"discard":      ops.Discard,
+	"clear":        ops.Clear,
+	"copy":         ops.Copy,
+	"undo":         undo,
+	"redo":         redo,
+	"oplog":        oplogList,
 }
 
 func undo(args []string) int {
 	n := 1
-	if len(args) > 0 {
-		v, err := strconv.Atoi(args[0])
-		if err != nil || v < 1 {
-			ui.Errf("gg undo: the count must be a positive number")
-			return 2
+	force := false
+	for _, arg := range args {
+		switch arg {
+		case "--force", "-f":
+			force = true
+		default:
+			v, err := strconv.Atoi(arg)
+			if err != nil || v < 1 {
+				ui.Errf("gg undo: the count must be a positive number")
+				return 2
+			}
+			n = v
 		}
-		n = v
 	}
-	return oplog.Undo(n)
+	return oplog.Undo(n, force)
 }
 
 func redo(args []string) int { return oplog.Redo() }
 
-func oplogList(args []string) int { return oplog.List() }
+func oplogList(args []string) int {
+	if len(args) > 0 && args[0] == "clear" {
+		return oplog.Clear()
+	}
+	return oplog.List()
+}
 
 // mutating verbs get an oplog entry and a footer.
 var mutating = map[string]bool{
@@ -94,8 +109,9 @@ var mutating = map[string]bool{
 	"split": true, "squash": true, "absorb": true, "empty": true,
 	"move": true, "publish": true, "sync": true, "update": true,
 	"abandon": true, "copy": true, "cp": true, "push": true, "pu": true, "up": true,
-	"edit": true, "continue": true, "hooks": true, "abort": true, "wt": true,
-	"new": true, "discard": true, "rs": true,
+	"edit": true, "continue": true, "hooks": true, "abort": true,
+	"new": true, "discard": true, "rs": true, "clear": true, "cl": true,
+	"revert": true, "rv": true,
 	"reword": true, "rename": true, "describe": true, "desc": true,
 }
 

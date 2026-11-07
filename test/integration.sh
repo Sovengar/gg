@@ -31,7 +31,11 @@ assert_lacks() { # name, haystack, needle
 }
 
 build() {
-	(cd "$REPO" && GOFLAGS=-buildvcs=false "$GO" build -o "$BIN" .) || {
+	if (cd "$REPO" && GOFLAGS=-buildvcs=false "$GO" build -o "$BIN" .); then
+		return 0
+	fi
+	echo "default Go toolchain failed; retrying with mise go@1.26.3" >&2
+	(cd "$REPO" && GOFLAGS=-buildvcs=false mise exec go@1.26.3 -- go build -o "$BIN" .) || {
 		echo "build failed"
 		exit 1
 	}
@@ -129,6 +133,77 @@ for i in $(seq 1 105); do
 done
 assert_eq "oplog keeps the newest 100 entries" "$("$BIN" oplog | wc -l | tr -d ' ')" "100"
 
+echo "oplog fixes"
+R=$(newrepo)
+cd "$R" || exit 1
+echo base > base.txt
+git add . >/dev/null 2>&1
+git commit -q -m base
+echo one > a.txt
+"$BIN" c -m c1 >/dev/null 2>&1
+"$BIN" undo >/dev/null 2>&1
+echo EDITED >> base.txt
+"$BIN" redo >/dev/null 2>&1
+assert_eq "redo restores the undone target" "$(cat base.txt)" "base"
+"$BIN" undo >/dev/null 2>&1
+assert_contains "undo after redo returns the edit" "$(cat base.txt)" "EDITED"
+
+R=$(newrepo)
+cd "$R" || exit 1
+echo keep > tracked.txt
+git add . >/dev/null 2>&1
+git commit -q -m tracked
+echo edit >> tracked.txt
+echo fresh > new.txt
+"$BIN" discard >/dev/null 2>&1
+"$BIN" undo >/dev/null 2>&1
+status=$(git status --porcelain)
+case "$status" in
+"A  "*) no "undo leaves the restored tree unstaged (got: $status)" ;;
+*) ok "undo leaves the restored tree unstaged" ;;
+esac
+assert_contains "undo leaves the tracked edit unstaged" "$status" " M tracked.txt"
+assert_contains "undo leaves the new file untracked" "$status" "?? new.txt"
+assert_contains "undo keeps the restored content" "$(cat tracked.txt)" "edit"
+
+R=$(newrepo)
+cd "$R" || exit 1
+echo one > a.txt
+"$BIN" c -m first >/dev/null 2>&1
+echo two > b.txt
+"$BIN" c -m second >/dev/null 2>&1
+assert_eq "consecutive verbs snapshot twice" "$("$BIN" oplog | wc -l | tr -d ' ')" "2"
+assert_eq "temporary index files are removed" "$(find .git -maxdepth 1 -name 'gg-tmp-index*' | wc -l | tr -d ' ')" "0"
+assert_contains "oplog clear explains git gc" "$("$BIN" oplog clear)" "git gc --prune=now"
+assert_eq "oplog clear empties the log" "$("$BIN" oplog)" "no operations yet"
+if "$BIN" oplog >/dev/null 2>&1; then ok "empty oplog exits 0"; else no "empty oplog exits 0"; fi
+
+R=$(mktemp -d)
+cd "$R" || exit 1
+git init -q -b tb .
+out=$("$BIN" oplog)
+rc=$?
+assert_eq "oplog on a fresh repo exits 0" "$rc" "0"
+assert_contains "oplog on a fresh repo says no operations" "$out" "no operations yet"
+
+BARE=$(mktemp -d)/remote.git
+git init -q --bare -b tb "$BARE"
+R=$(mktemp -d)
+git clone -q "$BARE" "$R" 2>/dev/null
+cd "$R" || exit 1
+git commit -q --allow-empty -m one
+git push -q -u origin tb 2>/dev/null
+git commit -q --allow-empty -m two
+"$BIN" c --allow-empty -m three >/dev/null 2>&1
+out=$("$BIN" undo 2>&1)
+rc=$?
+assert_eq "undo refuses when ahead of the upstream" "$rc" "1"
+assert_contains "undo guard names the branch" "$out" "tb"
+assert_contains "undo guard asks for force" "$out" "--force"
+assert_eq "the refused undo leaves HEAD alone" "$(git log -1 --format=%s)" "three"
+"$BIN" undo --force >/dev/null 2>&1
+assert_eq "undo --force bypasses the guard" "$(git log -1 --format=%s)" "two"
+
 echo "uncommit"
 R=$(newrepo)
 cd "$R" || exit 1
@@ -154,21 +229,21 @@ assert_eq "uncommit by id keeps HEAD on top" "$(git log --format=%s -1)" "two"
 assert_eq "uncommit by id hands the change back" "$(git status --porcelain)" "?? a.txt"
 if "$BIN" uncommit nope 2>/dev/null; then no "uncommit guards unknown ids"; else ok "uncommit guards unknown ids"; fi
 
-echo "bare gg and handles"
+echo "bare gg and changeIds"
 R=$(newrepo)
 cd "$R" || exit 1
 echo hi > f.txt
-handle=$("$BIN" log 1 | awk '{print $2}')
-case "$handle" in
-??|???|????) ok "log shows a bare handle" ;;
-*) no "log shows a bare handle (got: $handle)" ;;
+changeId=$("$BIN" log 1 | awk '{print $2}')
+case "$changeId" in
+??|???|????) ok "log shows a bare changeId" ;;
+*) no "log shows a bare changeId (got: $changeId)" ;;
 esac
-assert_contains "id resolves the handle" "$("$BIN" id "$handle")" "$handle"
-sha_len=$("$BIN" id "$handle" | awk '{print length($2)}')
+assert_contains "id resolves the changeId" "$("$BIN" id "$changeId")" "$changeId"
+sha_len=$("$BIN" id "$changeId" | awk '{print length($2)}')
 assert_eq "id prints a full sha" "$sha_len" "40"
-assert_contains "handle resolves inside a verb" "$("$BIN" -p show "$handle")" "git show"
-if "$BIN" id zzz >/dev/null 2>&1; then no "unknown handle is rejected"; else ok "unknown handle is rejected"; fi
-assert_contains "explicit @handle still works" "$("$BIN" id "@$handle")" "$handle"
+assert_contains "changeId resolves inside a verb" "$("$BIN" -p show "$changeId")" "git show"
+if "$BIN" id zzz >/dev/null 2>&1; then no "unknown changeId is rejected"; else ok "unknown changeId is rejected"; fi
+assert_contains "explicit @changeId still works" "$("$BIN" id "@$changeId")" "$changeId"
 
 echo "log default and dashboard"
 R=$(newrepo)
@@ -182,7 +257,7 @@ out=$("$BIN")
 assert_contains "dashboard has files" "$out" "files"
 assert_contains "dashboard has commits" "$out" "commits"
 assert_contains "dashboard has branches" "$out" "branches"
-assert_contains "dashboard has a handle" "$out" "commit 8"
+assert_contains "dashboard has a changeId" "$out" "commit 8"
 
 echo "aliases and abort"
 R=$(newrepo)
@@ -192,8 +267,8 @@ help=$("$BIN" help)
 assert_contains "help groups commit (c, ca)" "$help" "commit (c, ca)"
 assert_contains "help groups push (pu)" "$help" "push (pu)"
 assert_contains "help groups update (up)" "$help" "update (up)"
-handle=$("$BIN" log 1 | awk '{print $2}')
-"$BIN" edit "$handle" >/dev/null 2>&1
+changeId=$("$BIN" log 1 | awk '{print $2}')
+"$BIN" edit "$changeId" >/dev/null 2>&1
 assert_eq "edit stops the rebase" "$(git rev-parse --abbrev-ref HEAD)" "HEAD"
 "$BIN" abort >/dev/null 2>&1
 assert_eq "abort restores the branch" "$(git rev-parse --abbrev-ref HEAD)" "tb"
@@ -220,9 +295,9 @@ assert_contains "split prints" "$("$BIN" -p split ab -- f.txt)" "gg split ab -- 
 
 echo "renamed verbs"
 assert_contains "reflog verb" "$("$BIN" -p reflog)" "reflog"
-assert_contains "branches verb" "$("$BIN" -p branches)" "branch --sort"
-assert_contains "br alias" "$("$BIN" -p br)" "branch --sort"
-assert_contains "branch verb" "$("$BIN" -p branch)" "branch --sort"
+assert_contains "branches verb" "$("$BIN" -p branches)" "gg branches"
+assert_contains "br alias" "$("$BIN" -p br trunk)" "gg br trunk"
+assert_contains "branch verb" "$("$BIN" -p branch)" "gg branch"
 assert_contains "log alias renders" "$("$BIN" -p log 3)" "gg log 3"
 assert_eq "dw is gone" "$("$BIN" -p dw)" "git dw"
 assert_contains "diff takes -w" "$("$BIN" -p diff -w)" "git diff -w"
@@ -316,12 +391,19 @@ git commit -q --allow-empty -m one
 "$BIN" push >/dev/null 2>&1
 echo hi > f.txt
 "$BIN" new >/dev/null 2>&1
+echo more >> f.txt
+head_before=$(git rev-parse HEAD)
 out=$("$BIN" push </dev/null 2>&1)
 rc=$?
 assert_eq "push refuses the wip" "$rc" "1"
 assert_contains "push names the wip" "$out" "HEAD is a wip commit"
+assert_eq "push leaves HEAD alone" "$(git rev-parse HEAD)" "$head_before"
+assert_contains "push does not fold the tree" "$(git status --porcelain)" "f.txt"
 "$BIN" c -m "real" >/dev/null 2>&1
 if "$BIN" push </dev/null >/dev/null 2>&1; then ok "push works after finalize"; else no "push works after finalize"; fi
+out=$("$BIN" new 2>&1)
+assert_contains "new warns on a published branch" "$out" "published"
+"$BIN" uncommit >/dev/null 2>&1
 
 echo "worktrees"
 R=$(newrepo)
@@ -332,6 +414,12 @@ if [ -f "$side/.git" ]; then ok "wt new creates a sibling worktree"; else no "wt
 if [ -d "$side" ]; then ok "wt new made the directory"; else no "wt new made the directory"; fi
 assert_contains "wt ls lists the branch" "$("$BIN" wt ls)" "side"
 assert_lacks "wt ls prints no footer" "$("$BIN" wt ls)" "ahead"
+git worktree add -q "$R.otherwt" -b other 2>/dev/null
+out=$("$BIN" wt new other 2>&1)
+rc=$?
+assert_eq "wt new refuses a busy branch" "$rc" "1"
+assert_contains "wt new names the busy worktree" "$out" "checked out in"
+git worktree remove --force "$R.otherwt" >/dev/null 2>&1
 if "$BIN" wt rm tb >/dev/null 2>&1; then no "wt rm refuses the main worktree"; else ok "wt rm refuses the main worktree"; fi
 echo dirty > "$side/x.txt"
 if "$BIN" wt rm side >/dev/null 2>&1; then no "wt rm refuses a dirty worktree"; else ok "wt rm refuses a dirty worktree"; fi
@@ -339,8 +427,20 @@ if "$BIN" wt rm side >/dev/null 2>&1; then no "wt rm refuses a dirty worktree"; 
 if [ -d "$side" ]; then no "wt rm --force removes it"; else ok "wt rm --force removes it"; fi
 assert_lacks "wt ls forgot it" "$("$BIN" wt ls)" "side"
 
-echo "wt new folds a wip first"
+echo "the wip fold waits for a stopped operation"
 R=$(newrepo)
+cd "$R" || exit 1
+echo hi > f.txt
+"$BIN" new >/dev/null 2>&1
+echo edit >> f.txt
+head_before=$(git rev-parse HEAD)
+mkdir -p .git/rebase-merge
+"$BIN" update >/dev/null 2>&1
+assert_eq "a stopped rebase blocks the fold" "$(git rev-parse HEAD)" "$head_before"
+assert_contains "the tree stays dirty during a rebase" "$(git status --porcelain)" "f.txt"
+rmdir .git/rebase-merge
+
+echo "wt new folds a wip first"R=$(newrepo)
 cd "$R" || exit 1
 echo base > f.txt
 git add . >/dev/null 2>&1
@@ -353,7 +453,7 @@ assert_contains "wt new folds the edit into the wip" "$(git -C "$side" show HEAD
 assert_eq "wt new leaves the main tree clean" "$(git status --porcelain)" ""
 "$BIN" wt rm side >/dev/null 2>&1
 
-echo "commit and discard by handle"
+echo "commit and discard by changeId"
 R=$(newrepo)
 cd "$R" || exit 1
 echo one > a.txt
@@ -364,11 +464,11 @@ echo edit >> a.txt
 echo fresh > c.txt
 h=$(NO_COLOR=1 "$BIN" dash | awk '$3=="a.txt"{print $1}')
 "$BIN" c -m "only a" "$h" >/dev/null 2>&1
-assert_eq "commit takes one handle" "$(git show --name-only --format= HEAD)" "a.txt"
+assert_eq "commit takes one changeId" "$(git show --name-only --format= HEAD)" "a.txt"
 assert_contains "the other path stays dirty" "$(git status --porcelain)" "c.txt"
 h=$(NO_COLOR=1 "$BIN" dash | awk '$3=="c.txt"{print $1}')
 "$BIN" c -m "add c" "$h" >/dev/null 2>&1
-assert_eq "commit takes an untracked handle" "$(git show --name-only --format= HEAD)" "c.txt"
+assert_eq "commit takes an untracked changeId" "$(git show --name-only --format= HEAD)" "c.txt"
 assert_eq "nothing dirty is left" "$(git status --porcelain)" ""
 echo edit >> a.txt
 "$BIN" discard a.txt >/dev/null 2>&1
@@ -404,7 +504,23 @@ echo x >> a.txt
 if "$BIN" revert HEAD >/dev/null 2>&1; then no "revert refuses a wip"; else ok "revert refuses a wip"; fi
 
 assert_contains "help lists clear as cl" "$("$BIN" help)" "clear (cl)"
-assert_contains "help lists revert as rv" "$("$BIN" help)" "revert (rv)"
+assert_contains "help lists revert" "$("$BIN" help)" "revert (rv)"
+
+echo "old surface is gone"
+out=$("$BIN" help)
+assert_lacks "help has no Changes section" "$out" "Changes:"
+assert_lacks "help has no cl-wd" "$out" "cl-wd"
+assert_lacks "help has no cl-sa" "$out" "cl-sa"
+if "$BIN" cl-wd >/dev/null 2>&1; then no "cl-wd fails"; else ok "cl-wd fails"; fi
+if "$BIN" cl-sa >/dev/null 2>&1; then no "cl-sa fails"; else ok "cl-sa fails"; fi
+if "$BIN" ia >/dev/null 2>&1; then no "ia fails"; else ok "ia fails"; fi
+if "$BIN" aa >/dev/null 2>&1; then no "aa fails"; else ok "aa fails"; fi
+assert_lacks "help has no hidden add" "$("$BIN" help -all)" "la patch"
+if "$BIN" us >/dev/null 2>&1; then no "us fails"; else ok "us fails"; fi
+assert_contains "cl-wd names discard" "$("$BIN" cl-wd 2>&1)" "gg discard"
+if "$BIN" discard -a >/dev/null 2>&1; then no "discard -a fails"; else ok "discard -a fails"; fi
+assert_contains "discard -a explains" "$("$BIN" discard -a 2>&1)" "no -a"
+if "$BIN" clear -a >/dev/null 2>&1; then no "clear -a fails"; else ok "clear -a fails"; fi
 
 echo "copy a commit onto a branch"
 R=$(newrepo)
@@ -423,7 +539,62 @@ h=$(NO_COLOR=1 "$BIN" log 2 | awk '$5=="init"{print $2}')
 "$BIN" cp "$h" other >/dev/null 2>&1
 assert_contains "cp is still an alias" "$("$BIN" -p copy "$h" other)" "gg copy"
 if "$BIN" copy "$h" nope >/dev/null 2>&1; then no "copy refuses an unknown branch"; else ok "copy refuses an unknown branch"; fi
-if "$BIN" copy >/dev/null 2>&1; then no "copy requires a handle"; else ok "copy requires a handle"; fi
+if "$BIN" copy >/dev/null 2>&1; then no "copy requires a changeId"; else ok "copy requires a changeId"; fi
+
+echo "branch switch and delete"
+R=$(newrepo)
+cd "$R" || exit 1
+git branch side
+"$BIN" br side >/dev/null 2>&1
+assert_eq "br switches to a branch" "$(git rev-parse --abbrev-ref HEAD)" "side"
+assert_eq "br never creates a branch" "$(git for-each-ref refs/heads --format='%(refname:short)' | wc -l | tr -d ' ')" "2"
+if "$BIN" br nope >/dev/null 2>&1; then no "br refuses an unknown branch"; else ok "br refuses an unknown branch"; fi
+assert_contains "br points at cbr" "$("$BIN" br nope 2>&1)" "gg cbr nope"
+"$BIN" branch new fresh >/dev/null 2>&1
+assert_eq "branch new creates and switches" "$(git rev-parse --abbrev-ref HEAD)" "fresh"
+"$BIN" br tb >/dev/null 2>&1
+"$BIN" dbr side >/dev/null 2>&1
+assert_eq "dbr deletes a merged branch" "$(git for-each-ref refs/heads/side --format='%(refname:short)')" ""
+assert_eq "dbr keeps a backup ref" "$(git for-each-ref refs/gg/deleted/side --format='%(refname)')" "refs/gg/deleted/side"
+git branch unmerged side >/dev/null 2>&1
+if "$BIN" br -d unmerged >/dev/null 2>&1; then no "br -d refuses unmerged work"; else ok "br -d refuses unmerged work"; fi
+"$BIN" br -D unmerged >/dev/null 2>&1
+assert_eq "br -D forces the delete" "$(git for-each-ref refs/heads/unmerged --format='%(refname:short)')" ""
+if "$BIN" dbr tb >/dev/null 2>&1; then no "dbr refuses the current branch"; else ok "dbr refuses the current branch"; fi
+
+echo "branch changeIds stay apart on one commit"
+R=$(newrepo)
+cd "$R" || exit 1
+git branch twin
+changeIds=$(NO_COLOR=1 "$BIN" br | awk '{if ($1 == "*") {h = $2; n = $3} else {h = $1; n = $2} if (n == "tb" || n == "twin") print h}' | sort -u)
+count=$(printf '%s\n' "$changeIds" | grep -c .)
+if [ "$count" -eq 2 ]; then ok "two branches on one commit get different changeIds"; else no "two branches on one commit get different changeIds (got: $changeIds)"; fi
+twin=$(NO_COLOR=1 "$BIN" br | awk '$1 == "twin" || $2 == "twin" {print ($1 == "*") ? $2 : $1}')
+"$BIN" br "$twin" >/dev/null 2>&1
+assert_eq "br switches by branch changeId" "$(git rev-parse --abbrev-ref HEAD)" "twin"
+assert_contains "br list shows a changeId per branch" "$(NO_COLOR=1 "$BIN" br | grep twin)" "$twin"
+
+echo "a changeId survives a rewrite"
+R=$(newrepo)
+cd "$R" || exit 1
+"$BIN" hooks >/dev/null 2>&1
+echo one > a.txt
+git add . >/dev/null 2>&1
+git commit -q -m one
+cid=$(NO_COLOR=1 "$BIN" log 1 | awk '{print $2}')
+sha1=$(git rev-parse HEAD)
+git commit -q --amend --no-edit
+sha2=$(git rev-parse HEAD)
+cid2=$(NO_COLOR=1 "$BIN" log 1 | awk '{print $2}')
+if [ "$sha1" != "$sha2" ]; then ok "amend moved the sha"; else no "amend moved the sha"; fi
+assert_eq "the changeId survived the amend" "$cid2" "$cid"
+echo two > b.txt
+git add . >/dev/null 2>&1
+git commit -q -m two
+git reset -q --hard HEAD~1
+git cherry-pick -q "$sha2" >/dev/null 2>&1
+cid3=$(NO_COLOR=1 "$BIN" log 1 | awk '{print $2}')
+assert_eq "the changeId survived a cherry-pick" "$cid3" "$cid"
 
 echo
 echo "passed $pass, failed $fail"

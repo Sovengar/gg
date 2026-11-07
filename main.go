@@ -26,10 +26,10 @@ const (
 	modePrint
 )
 
-// index is loaded once per run and reused by handles and the footer.
+// index is loaded once per run and reused by changeIDs and the footer.
 var index = &ids.Index{}
 
-func handleIndex() *ids.Index {
+func changeIndex() *ids.Index {
 	if ix, err := ids.Load(); err == nil {
 		index = ix
 	}
@@ -83,6 +83,11 @@ func run(argv []string) int {
 
 	entry, ok := verbs.Lookup(name)
 	if !ok {
+		// a verb gg dropped says where its work went, instead of failing in git
+		if hint, gone := removed[name]; gone {
+			ui.Errf("gg: %s is gone. %s", name, hint)
+			return 2
+		}
 		// unknown verb: straight to git, still recorded by the mutating set
 		return execArgv(append([]string{name}, rest...), name, m)
 	}
@@ -109,7 +114,7 @@ func parseFlags(argv []string) (mode, []string) {
 	return m, args
 }
 
-// dataFlags take an argument that must never be treated as a handle.
+// dataFlags take an argument that must never be treated as a changeId.
 var dataFlags = map[string]bool{
 	"-m": true, "--message": true, "-F": true, "--file": true,
 	"-L": true, "-S": true, "-G": true, "--grep": true,
@@ -117,8 +122,8 @@ var dataFlags = map[string]bool{
 	"-t": true, "--template": true, "-x": true, "--exec": true,
 }
 
-// resolveArgs replaces handle-shaped arguments with the commit or branch they
-// name. Real refs and existing paths win over handles.
+// resolveArgs replaces changeId-shaped arguments with the commit or branch they
+// name. Real refs and existing paths win over changeIDs.
 func resolveArgs(name string, args []string) ([]string, int) {
 	out := make([]string, len(args))
 	skipNext := false
@@ -142,11 +147,26 @@ func resolveArgs(name string, args []string) ([]string, int) {
 			out[i] = a
 			continue
 		}
+		// "branch new <name>" reads new as a subcommand, never as a changeId
+		if i == 0 && a == "new" && newSubcommand(name) {
+			out[i] = a
+			continue
+		}
+		if branchVerb(name) && !isRef(a) {
+			// a branch changeId names the branch itself, not the commit it points at
+			switch bname, st := branchIndex().Resolve(strings.TrimPrefix(a, "@")); st {
+			case ids.Resolved:
+				out[i] = bname
+				continue
+			case ids.Ambiguous:
+				return out, 2
+			}
+		}
 		if !ids.Shaped(strings.TrimPrefix(a, "@")) || isRef(a) || isPath(a) {
 			out[i] = a
 			continue
 		}
-		ref, status := handleIndex().Resolve(a)
+		ref, status := changeIndex().Resolve(a)
 		switch status {
 		case ids.Resolved:
 			if ref.Branch != "" {
@@ -171,6 +191,20 @@ func resolveArgs(name string, args []string) ([]string, int) {
 
 var fileIdx *files.Index
 
+var brIdx *ids.BranchIndex
+
+func branchIndex() *ids.BranchIndex {
+	if brIdx != nil {
+		return brIdx
+	}
+	ix, err := ids.LoadBranches()
+	if err != nil {
+		ix = &ids.BranchIndex{}
+	}
+	brIdx = ix
+	return brIdx
+}
+
 func fileIndex() *files.Index {
 	if fileIdx == nil {
 		fileIdx = files.Load()
@@ -178,30 +212,56 @@ func fileIndex() *files.Index {
 	return fileIdx
 }
 
-// pathVerbs are the only verbs where a file handle may replace an argument.
+// pathVerbs are the only verbs where a file changeId may replace an argument.
 var pathVerbs = map[string]bool{
-	"add": true, "a": true, "aa": true, "ia": true,
-	"diff": true, "rs": true, "restore": true, "us": true,
-	"cl": true, "cl-wd": true, "cl-sa": true,
+	"diff": true, "rs": true, "restore": true,
 	"commit": true, "c": true, "ca": true, "discard": true,
 }
 
 func pathVerb(name string) bool { return pathVerbs[name] }
 
-// noResolve are verbs whose arguments are not handles.
+// branchVerbs take a branch name or a branch changeId.
+var branchVerbs = map[string]bool{
+	"branch": true, "br": true, "branches": true,
+	"sw": true, "switch": true, "cbr": true,
+	"dbr": true, "delete-branch": true, "mg": true, "merge": true,
+}
+
+func branchVerb(name string) bool { return branchVerbs[name] }
+
+// newSubcommand lists the branch verbs where a leading "new" is the create
+// subcommand, never a branch that happens to be called new.
+var newSubcommandVerbs = map[string]bool{
+	"branch": true, "br": true, "branches": true,
+}
+
+func newSubcommand(name string) bool { return newSubcommandVerbs[name] }
+
+// removed verbs name the verb that took their work, so an old habit fails with
+// a direction instead of a git error.
+var removed = map[string]string{
+	"cl-wd": "Use gg discard to drop edits, and gg clear to delete new files.",
+	"cl-sa": "It took the index. Use gg discard or gg clear.",
+	"us":    "It took the index. Use gg discard or gg clear.",
+}
+
+// noResolve are verbs whose arguments are not changeIDs.
 var noResolve = map[string]bool{
 	"raw": true, "undo": true, "redo": true, "oplog": true,
 }
 
 // wipFold lists the verbs that fold uncommitted edits into an active wip
 // commit before they run. Path-scoped verbs are never listed: they address the
-// tree themselves and folding first would hand them the wrong base.
+// tree themselves and folding first would hand them the wrong base. push is
+// absent too: it refuses a wip commit outright, so folding would rewrite HEAD
+// for a command that changes nothing.
 var wipFold = map[string]bool{
-	"update": true, "up": true, "sync": true, "push": true, "pu": true,
+	"update": true, "up": true, "sync": true,
 	"sw": true, "switch": true, "cbr": true, "mg": true, "merge": true,
 	"amend": true, "absorb": true, "edit": true, "continue": true,
 	"reword": true, "rename": true, "describe": true, "desc": true,
 	"squash": true, "split": true, "move": true, "abandon": true, "copy": true, "cp": true,
+	"uncommit": true,
 }
 
 func isRef(token string) bool {
@@ -311,7 +371,7 @@ func footer(verb string) {
 			behind = strconv.Itoa(n)
 		}
 	}
-	fmt.Println(ui.Dim(fmt.Sprintf("  %s · ahead %s · behind %s", handleIndex().Short(sha), ahead, behind)))
+	fmt.Println(ui.Dim(fmt.Sprintf("  %s · ahead %s · behind %s", changeIndex().Short(sha), ahead, behind)))
 }
 
 func help(argv []string) int {
@@ -327,6 +387,9 @@ func help(argv []string) int {
 	var order []string
 	groups := make(map[string][]verbs.Entry)
 	for _, e := range entries {
+		if e.Hidden {
+			continue // an all-hidden category prints no header
+		}
 		if _, seen := groups[e.Category]; !seen {
 			order = append(order, e.Category)
 		}
@@ -371,11 +434,11 @@ func help(argv []string) int {
 	return 0
 }
 
-// showIDs prints the commit behind one or more handles.
+// showIDs prints the commit behind one or more changeIDs.
 func showIDs(args []string) int {
 	if len(args) == 0 {
 		if sha, ok := gitx.Head(); ok {
-			fmt.Printf("%s\n", handleIndex().Short(sha))
+			fmt.Printf("%s\n", changeIndex().Short(sha))
 			return 0
 		}
 		ui.Errf("gg: no commits yet")
@@ -383,13 +446,13 @@ func showIDs(args []string) int {
 	}
 	rc := 0
 	for _, a := range args {
-		ref, status := handleIndex().Resolve(a)
+		ref, status := changeIndex().Resolve(a)
 		if status != ids.Resolved {
 			ui.Errf("gg: %s matches no single commit", a)
 			rc = 1
 			continue
 		}
-		line := fmt.Sprintf("%s %s", handleIndex().Handle(ref.SHA), ref.SHA)
+		line := fmt.Sprintf("%s %s", changeIndex().ChangeID(ref.SHA), ref.SHA)
 		if ref.Branch != "" {
 			line += "  (" + ref.Branch + ")"
 		}

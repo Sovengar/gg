@@ -32,7 +32,7 @@ gg diff -w         diff ignoring whitespace
 gg copy kd main    copy that commit onto main, back on your branch after (alias: cp)
 gg copy kd         copy it onto the branch you are on
 gg c -m "msg"      commit every dirty path (aliases: commit, ca)
-gg c -m "msg" kd qz  commit only those handles
+gg c -m "msg" kd qz  commit only those changeIds
 gg discard kd      drop that change, keep the rest (alias: rs); undoable with gg undo
 gg discard         drop every edit, keep the new files
 gg clear           drop every edit and delete the new files (-f skips the question)
@@ -67,7 +67,7 @@ gg tools           external tools + install state
 Unknown verbs go straight to git: `gg log --oneline -5` runs `git log --oneline -5`.
 
 Help is grouped like `but --help`: Title Case categories with a colon —
-Inspection, Changes, Rollback work, Register work, Edit saved work, Branching,
+Inspection, Rollback work, Register work, Edit saved work, Branching,
 Operations, Remote, Tools. There is no stash: the working tree, the index and
 wip commits are one mechanism (`gg new`, `gg wt`).
 The canonical name comes first, short variants in
@@ -80,10 +80,21 @@ each row.
 Flags: `-p/--print`, `-n/--dry` print the resolved command instead of running.
 Environment: `GG_ECHO=1` traces the git call, `NO_COLOR=1` disables colour.
 
-### Changes, not staging
+### Verifying
 
-No verb asks you to stage. Every dirty path already carries a handle, so `gg c`
-takes handles and the index stays git's business:
+```
+gofmt -l . && go vet ./... && go test ./... && bash test/integration.sh
+```
+
+`test/integration.sh` builds gg itself and runs every case against real
+repositories. When the local `go` reports a toolchain mismatch (`compile:
+version ... does not match go tool version`), the script retries with
+`mise exec go@1.26.3`; use the same fallback by hand for `go test`.
+
+### ChangeIds, not staging
+
+No verb asks you to stage. Every dirty path already carries a changeId, so `gg c`
+takes changeIds and the index stays git's business:
 
 ```
 gg dash            kd M docs/README.md, px ?? notes.md
@@ -96,8 +107,7 @@ gg new             or park everything in a wip commit on the branch
 `gg discard` drops edits and keeps the new files: a new file is not a change
 to drop. `gg clear` drops the edits and deletes the new files, since no commit
 holds them and git cannot bring one back; without `-f` it asks first, and
-refuses when nobody can answer. `gg a` and `gg ia` still exist as hidden
-escape hatches until the handle model settles.
+refuses when nobody can answer.
 
 ### Work in progress and worktrees
 
@@ -116,10 +126,19 @@ gg wt ls           branch, path, and how dirty each worktree is
 gg wt rm side      remove it; --force when it is dirty
 ```
 
-### Handles
+### ChangeIds
 
-Every commit shows a three character handle derived from its sha, so it never
-changes:
+Every file, commit and branch in gg carries a changeId: two to four
+characters that name it.
+
+- A commit takes its changeId from the `Change-Id` trailer, so an amend, a
+  rebase or a squash keeps the same changeId while the sha changes. A commit
+  without that trailer falls back to a changeId derived from its sha.
+- A branch takes its changeId from the branch name, so two branches on one
+  commit never share it.
+- A dirty path takes its changeId from the path.
+
+A changeId is the shortest unique prefix, never shorter than two characters:
 
 ```
 * @nan 641682b (2 minutes ago) chore: dev env  (HEAD -> trunk) [Playground]
@@ -136,7 +155,10 @@ gg diff @na        resolves, then diffs
 ```
 
 When the commit is the tip of a local branch the branch name is used, so
-`gg sw @nan` switches to the branch rather than to a detached HEAD.
+`gg sw @nan` switches to the branch rather than to a detached HEAD. Branch
+verbs (`gg br`, `gg sw`, `gg cbr`, `gg dbr`, `gg mg`) read a branch changeId
+first, so `gg br 4d` names the branch even when another branch holds the same
+commit.
 
 ### External tools
 
@@ -161,8 +183,8 @@ is one line in `internal/verbs/verbs.tsv`; no Go change.
 ```
 
 One format everywhere: `gg log`, `gg dash` and the graph all print
-`graph handle sha age subject decorations [author]`. Lanes use box characters,
-the handle is red, the decoration `(...)` is yellow, and the ball is **green when every remote branch already has
+`graph changeId sha age subject decorations [author]`. Lanes use box characters,
+the changeId is red, the decoration `(...)` is yellow, and the ball is **green when every remote branch already has
 the commit, yellow when it is local only**. Age is compact: `30s`, `5m`, `2h`,
 `10d`, `3w`, `2mo`, painted by recency: bright green under an hour, then
 green, yellow and dim. A merge line also lists both sides it joined, as
@@ -205,7 +227,8 @@ and falls back to `git rebase --onto` for `abandon`:
 | `gg reword <id>` | `git history reword <id>` |
 | `gg split <id>` | `git history split <id>` |
 
-`reword` keeps the Change-Id trailer, so the handle does not move.
+`reword` keeps the Change-Id trailer, so the changeId does not move when the
+sha does.
 
 ### jj edit
 

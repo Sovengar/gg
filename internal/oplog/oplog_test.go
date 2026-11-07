@@ -108,7 +108,7 @@ func TestRecordListsEntriesNewestFirst(t *testing.T) {
 	}
 }
 
-func TestUndoRestoresDiscardedWorktreeAndRedoReturnsIt(t *testing.T) {
+func TestUndoRestoresClearedWorktreeAndRedoReturnsIt(t *testing.T) {
 	dir := newRepo(t)
 	inDir(t, dir)
 
@@ -118,9 +118,9 @@ func TestUndoRestoresDiscardedWorktreeAndRedoReturnsIt(t *testing.T) {
 
 	write(t, "tracked.txt", "keep\nedit\n")
 	write(t, "untracked.txt", "fresh\n")
-	Record("discard")
+	Record("clear")
 
-	// Simulate the discard itself.
+	// Simulate the clear itself.
 	git(t, dir, "reset", "--hard", "HEAD")
 	if err := os.Remove("untracked.txt"); err != nil {
 		t.Fatal(err)
@@ -233,4 +233,47 @@ func TestRetentionKeepsNewestHundred(t *testing.T) {
 	if !strings.Contains(lines[0], "commit") {
 		t.Errorf("newest entry = %q", lines[0])
 	}
+}
+
+func TestTrimClearsRedoOutsideTheNewChain(t *testing.T) {
+	dir := newRepo(t)
+	inDir(t, dir)
+
+	tree, err := emptyTree()
+	if err != nil {
+		t.Fatal(err)
+	}
+	prev := ""
+	for i := 0; i <= keep; i++ {
+		prev, err = commitEntry(tree, prev, "", "commit", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	newest := prev
+	redo, err := commitEntry(tree, "", "", "redo", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	setRef(oplogRef, newest)
+	setRef(curRef, newest)
+	setRef(redoRef, redo)
+	trim()
+
+	if _, ok := getRef(redoRef); ok {
+		t.Error("redo ref survived trim outside the rebuilt chain")
+	}
+	if got := len(chain(mustRef(t, curRef))); got != keep {
+		t.Errorf("chain length after trim = %d, want %d", got, keep)
+	}
+}
+
+func mustRef(t *testing.T, ref string) string {
+	t.Helper()
+	sha, ok := getRef(ref)
+	if !ok {
+		t.Fatalf("%s is not set", ref)
+	}
+	return sha
 }

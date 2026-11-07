@@ -19,6 +19,13 @@ func TestQuote(t *testing.T) {
 	}
 }
 
+func TestBranchNewIsNotAChangeID(t *testing.T) {
+	got, rc := resolveArgs("br", []string{"new", "side"})
+	if rc != 0 || len(got) != 2 || got[0] != "new" || got[1] != "side" {
+		t.Fatalf("resolveArgs(br, new side) = %q rc %d, want [new side]", got, rc)
+	}
+}
+
 func TestParseFlags(t *testing.T) {
 	m, args := parseFlags([]string{"-p", "st", "--dry"})
 	if m != modePrint {

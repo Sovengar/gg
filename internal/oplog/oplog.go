@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"gg/internal/gitx"
@@ -54,8 +55,8 @@ func Record(verb string) {
 func List() int {
 	cur, ok := getRef(curRef)
 	if !ok {
-		ui.Errf("gg: no operations recorded")
-		return 1
+		fmt.Println(ui.Dim("no operations yet"))
+		return 0
 	}
 	for _, sha := range chain(cur) {
 		short, err := gitx.Output("rev-parse", "--short", sha)
@@ -69,8 +70,19 @@ func List() int {
 	return 0
 }
 
-// Undo restores the state before the last n operations.
-func Undo(n int) int {
+// Clear drops the oplog refs. The objects stay in the repository until git gc.
+func Clear() int {
+	clearRef(oplogRef)
+	clearRef(curRef)
+	clearRef(redoRef)
+	fmt.Println(ui.Dim("gg: oplog cleared; run git gc --prune=now to drop the objects"))
+	return 0
+}
+
+// Undo restores the state before the last n operations. A leading force
+// argument bypasses the published-commit guard.
+func Undo(n int, force ...bool) int {
+	forced := len(force) > 0 && force[0]
 	if n < 1 {
 		n = 1
 	}
@@ -119,7 +131,18 @@ func Undo(n int) int {
 		}
 		target = prev
 	}
-	if rc := restore(target); rc != 0 {
+	if !forced {
+		if targetHead, ok := p2(target); ok {
+			if upstream, ok := gitx.Upstream(); ok {
+				if !isAncestor(upstream, targetHead) {
+					branch, _ := gitx.Output("rev-parse", "--abbrev-ref", "HEAD")
+					ui.Errf("gg: undo would remove commits published on %s; pass --force to undo anyway", branch)
+					return 1
+				}
+			}
+		}
+	}
+	if rc := restore(target, cur); rc != 0 {
 		return rc
 	}
 	setRef(curRef, target)
@@ -131,23 +154,64 @@ func Undo(n int) int {
 	return 0
 }
 
-// Redo restores the state an undo left behind.
+// Redo restores the state an undo left behind. It records the current state
+// first, so a following undo returns edits made after the undo.
 func Redo() int {
-	redo, ok := getRef(redoRef)
+	target, ok := getRef(redoRef)
 	if !ok {
 		ui.Errf("gg: nothing to redo")
 		return 1
 	}
-	if rc := restore(redo); rc != 0 {
+
+	tree, err := snapshotTree()
+	if err != nil {
+		ui.Errf("gg: oplog: %v", err)
+		return 1
+	}
+	head, hasHead := gitx.Head()
+	targetTree, _ := entryTree(target)
+	targetHead, hasTargetHead := p2(target)
+	same := tree == targetTree && hasHead == hasTargetHead && (!hasHead || head == targetHead)
+
+	restoreSha := target
+	from := ""
+	if !same {
+		// Insert the current state before the target, then rebuild the target
+		// state on top of it. The next undo lands on the recorded edit.
+		prev, _ := getRef(curRef)
+		edit, err := commitEntry(tree, prev, head, "redo", "")
+		if err != nil {
+			ui.Errf("gg: oplog: %v", err)
+			return 1
+		}
+		verb, _ := gitx.Output("log", "-1", "--format=%s", target)
+		date, _ := gitx.Output("log", "-1", "--format=%ct", target)
+		restoreSha, err = commitEntry(targetTree, edit, targetHead, verb, date)
+		if err != nil {
+			ui.Errf("gg: oplog: %v", err)
+			return 1
+		}
+		from = edit
+		setRef(oplogRef, restoreSha)
+	}
+
+	if rc := restore(restoreSha, from); rc != 0 {
 		return rc
 	}
-	setRef(curRef, redo)
+	setRef(curRef, restoreSha)
 	clearRef(redoRef)
 	return 0
 }
 
-// restore resets HEAD and the worktree to an entry.
-func restore(sha string) int {
+// restore resets HEAD and the worktree to an entry. from is the state being
+// left behind: it is loaded into the index first so files that are absent from
+// the target are removed even when they are currently untracked.
+func restore(sha, from string) int {
+	if from != "" {
+		if rc := gitx.Run("read-tree", "-u", "--reset", from); rc != 0 {
+			return rc
+		}
+	}
 	if head, ok := p2(sha); ok {
 		if rc := gitx.Run("reset", "--hard", head); rc != 0 {
 			return rc
@@ -156,6 +220,13 @@ func restore(sha string) int {
 		_, _ = gitx.Output("update-ref", "-d", "HEAD")
 	}
 	if rc := gitx.Run("read-tree", "-u", "--reset", sha); rc != 0 {
+		return rc
+	}
+	if _, ok := gitx.Head(); ok {
+		if rc := gitx.Run("reset", "--quiet"); rc != 0 {
+			return rc
+		}
+	} else if rc := gitx.Run("read-tree", "--empty"); rc != 0 {
 		return rc
 	}
 	setRef(curRef, sha)
@@ -174,7 +245,7 @@ func snapshotTree() (string, error) {
 			return "", err
 		}
 	}
-	index := filepath.Join(gitDir, "gg-tmp-index")
+	index := filepath.Join(gitDir, fmt.Sprintf("gg-tmp-index-%d-%d", os.Getpid(), tempSeq.Add(1)))
 	_ = os.Remove(index)
 	defer os.Remove(index)
 
@@ -193,6 +264,8 @@ func snapshotTree() (string, error) {
 	}
 	return outputEnv(env, "write-tree")
 }
+
+var tempSeq atomic.Uint64
 
 func emptyTree() (string, error) {
 	cmd := exec.Command("git", "mktree")
@@ -349,6 +422,15 @@ func trim() {
 	}
 	setRef(oplogRef, newest)
 	setRef(curRef, newest)
+	if redo, ok := getRef(redoRef); ok && !isAncestor(redo, newest) {
+		clearRef(redoRef)
+	}
+}
+
+// isAncestor reports whether a is an ancestor of b.
+func isAncestor(a, b string) bool {
+	_, err := gitx.Output("merge-base", "--is-ancestor", a, b)
+	return err == nil
 }
 
 // age renders a compact relative time: 5m, 2h, 10d, 3w.

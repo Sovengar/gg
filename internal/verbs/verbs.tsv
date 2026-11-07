@@ -15,42 +15,37 @@ stf	status --short --untracked-files=all	-	hidden
 log	fn:log	graph log, 6 commits by default	hint:Takes a count, -l for long lines
 dash	fn:dash	dashboard: branch, files, commits	hidden
 diff	diff	diff the tree	hint:Use -w to ignore whitespace
-show	show	one commit in full	hint:Takes a handle
-branch|br|branches	branch --sort=-committerdate	branches, newest first	display:branch (br)
-id	id	resolve a handle to a sha	nogit
-
-# --- Changes ---
-a	add	-	hidden
-aa	add -A	-	hidden
-ia	add --patch	-	hidden
+show	show	one commit in full	hint:Takes a changeId
+branch|br|branches	fn:branches	branches, or switch to one	hint:bare lists changeIds, new <name> creates	display:branch (br)
+id	id	resolve a changeId to a sha	nogit
 
 
 # --- Rollback work ---
-discard|rs	fn:discard	drop edits, keep new files	hint:Bare drops all. Takes a handle or a path
+discard|rs	fn:discard	drop edits, keep new files	hint:Bare drops all. Takes a changeId or a path
 clear|cl	fn:clear	drop edits and new files, back to HEAD	hint:Asks before deleting new files, -f skips
-uncommit	fn:uncommit	move commits back into the tree	hint:Takes handles, HEAD by default
-abandon	fn:abandon	drop one commit, replay its descendants	hint:Takes a handle
-revert|rv	fn:revert	undo one commit with a new commit	hint:Takes a handle, -m N for a merge
+uncommit	fn:uncommit	move commits back into the tree	hint:Takes changeIds, HEAD by default
+abandon	fn:abandon	drop one commit, replay its descendants	hint:Takes a changeId
+revert|rv	fn:revert	undo one commit with a new commit	hint:Takes a changeId, -m N for a merge
 
 # --- Register work ---
-commit|c|ca	fn:commit	save the changes you name, or all of them	hint:Add a message with -m. A handle names one change.
+commit|c|ca	fn:commit	save the changes you name, or all of them	hint:Add a message with -m. A changeId names one change.
 new	fn:new	save the changes, absorb more until you commit	hint:Add a message with -m.
 empty	commit --allow-empty	record an empty commit
-copy|cp	fn:copy	copy a commit onto a branch	hint:Takes a handle, then a branch
+copy|cp	fn:copy	copy a commit onto a branch	hint:Takes a changeId, then a branch
 absorb	absorb	fold changes into the right commit
 
 # --- Edit saved work ---
-amend	fn:amend	fold changes into HEAD, or into a commit	hint:Takes a handle
-reword|rename|describe|desc	fn:reword	edit the message of a commit	hint:Takes a handle
-split	fn:split	cut one commit in two	hint:Takes a handle, then -- paths
-squash	fn:squash	fold a commit into its parent	hint:Takes a handle
-move	fn:move	replay a commit onto another base	hint:Takes a handle
-edit	fn:edit	stop a rebase at a commit	hint:Takes a handle
+amend	fn:amend	fold changes into HEAD, or into a commit	hint:Takes a changeId
+reword|rename|describe|desc	fn:reword	edit the message of a commit	hint:Takes a changeId
+split	fn:split	cut one commit in two	hint:Takes a changeId, then -- paths
+squash	fn:squash	fold a commit into its parent	hint:Takes a changeId
+move	fn:move	replay a commit onto another base	hint:Takes a changeId
+edit	fn:edit	stop a rebase at a commit	hint:Takes a changeId
 
 # --- Branching ---
 sw	switch	change branch	hint:Takes a branch
 cbr	switch -c	branch new and switch	hint:Takes a branch	display:branch new (cbr)
-dbr	branch -d	delete a merged branch	hint:Takes a branch
+dbr|delete-branch	fn:deleteBranch	delete a branch, tip kept in a ref	hint:Safe by default, -D forces. Takes a branch or a changeId
 mg	merge	merge a branch into this one	hint:Takes a branch
 wt	fn:wt	parallel branches, one worktree each	hint:Takes new|ls|rm
 
@@ -75,3 +70,4 @@ sim	tool:git-sim	render an operation before running
 hooks	fn:hooks	install the Change-Id hook
 tools	tools	external tools and their install state	nogit
 raw	raw	run git with any arguments, still undoable	nogit
+
