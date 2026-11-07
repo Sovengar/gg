@@ -406,7 +406,10 @@ assert_contains "push does not fold the tree" "$(git status --porcelain)" "f.txt
 "$BIN" c -m "real" >/dev/null 2>&1
 if "$BIN" push </dev/null >/dev/null 2>&1; then ok "push works after finalize"; else no "push works after finalize"; fi
 out=$("$BIN" new 2>&1)
-assert_contains "new warns on a published branch" "$out" "published"
+assert_lacks "a fresh wip is not published" "$out" "already on"
+git push -q origin tb >/dev/null 2>&1
+out=$("$BIN" new 2>&1)
+assert_contains "new warns when the wip is already pushed" "$out" "already on"
 "$BIN" uncommit >/dev/null 2>&1
 
 echo "worktrees"
@@ -417,6 +420,8 @@ side="$(dirname "$R")/$(basename "$R").side"
 if [ -f "$side/.git" ]; then ok "wt new creates a sibling worktree"; else no "wt new creates a sibling worktree"; fi
 if [ -d "$side" ]; then ok "wt new made the directory"; else no "wt new made the directory"; fi
 assert_contains "wt ls lists the branch" "$("$BIN" wt ls)" "side"
+assert_contains "dash draws a lane for the worktree" "$("$BIN" dash)" "[side]"
+assert_contains "dash names the other worktree" "$("$BIN" dash)" "side"
 assert_lacks "wt ls prints no footer" "$("$BIN" wt ls)" "ahead"
 git worktree add -q "$R.otherwt" -b other 2>/dev/null
 out=$("$BIN" wt new other 2>&1)
@@ -444,7 +449,8 @@ assert_eq "a stopped rebase blocks the fold" "$(git rev-parse HEAD)" "$head_befo
 assert_contains "the tree stays dirty during a rebase" "$(git status --porcelain)" "f.txt"
 rmdir .git/rebase-merge
 
-echo "wt new folds a wip first"R=$(newrepo)
+echo "wt new folds a wip first"
+R=$(newrepo)
 cd "$R" || exit 1
 echo base > f.txt
 git add . >/dev/null 2>&1
