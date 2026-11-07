@@ -62,14 +62,13 @@ gg tools           external tools + install state
 Unknown verbs go straight to git: `gg log --oneline -5` runs `git log --oneline -5`.
 
 Help is grouped like `but --help`: Title Case categories with a colon —
-Inspection, Changes, Branching and Committing, Editing Commits, Operations,
-Remote, Worktrees, Tools, Others. There is no stash: the
-working tree, the index and wip commits are one mechanism (`gg new`, `gg wt`).
+Inspection, Changes, Register work, Editing Commits, Branching, Operations,
+Remote, Tools. There is no stash: the working tree, the index and wip commits
+are one mechanism (`gg new`, `gg wt`).
 The canonical name comes first, short variants in
 parentheses: `commit (c)`, `push (pu)`, `status (st, sta, stf)`,
 `reword (rename, describe, desc)`. Parameter notes print in grey after the
-description. Verbs that fit no group live in Others (hooks, re, cl, cl-wd,
-cl-sa, raw, id, tools).
+description.
 `gg help` (or `gg h`) shows the verb table only; `gg help -all` adds the git command behind
 each row.
 

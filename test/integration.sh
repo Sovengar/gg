@@ -160,6 +160,10 @@ mid=$("$BIN" log 2 | tail -1 | awk '{print $2}')
 "$BIN" abandon "$mid" >/dev/null 2>&1
 assert_eq "abandon drops one commit" "$(git rev-list --count HEAD)" "$((before - 1))"
 assert_contains "help groups by category" "$("$BIN" help)" "Editing Commits:"
+assert_contains "help shows Register work" "$("$BIN" help)" "Register work:"
+assert_contains "help shows Branching" "$("$BIN" help)" "Branching:"
+assert_lacks "help drops the old branching category" "$("$BIN" help)" "Branching and Committing"
+assert_lacks "help drops Others" "$("$BIN" help)" "Others:"
 assert_contains "help shows reword" "$("$BIN" help)" "reword"
 assert_contains "help shows the git command with -all" "$("$BIN" help -all)" "git status --short"
 assert_contains "amend prints" "$("$BIN" -p amend)" "gg amend"

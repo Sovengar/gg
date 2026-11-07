@@ -17,6 +17,7 @@ dash	fn:dash	dashboard: branch, files, commits	hidden
 diff	diff	diff the tree	hint:Use -w to ignore whitespace
 show	show	one commit in full	hint:Takes a handle
 branches	branch --sort=-committerdate	branches, newest first
+id	id	resolve a handle to a sha	nogit
 
 # --- Changes ---
 discard|rs	fn:discard	drop changes, keep the rest	hint:Takes a handle, -a for all
@@ -25,19 +26,18 @@ aa	add -A	-	hidden
 ia	add --patch	-	hidden
 us	restore --staged	-	hidden
 
-# --- Branching and Committing ---
+cl	restore --source=HEAD --staged --worktree .	wipe tree and index
+cl-wd	restore --source=HEAD --worktree .	wipe the working tree
+cl-sa	restore --source=HEAD --staged	wipe the index	hidden
+
+# --- Register work ---
 commit|c|ca	fn:commit	record the named changes, all when none	hint:Use -m "msg", takes handles
 new	fn:new	start a wip commit that absorbs your edits	hint:Takes -m "msg"
 empty	commit --allow-empty	record an empty commit
-br	branch	list branches
-sw	switch	change branch	hint:Takes a branch
-cbr	switch -c	create and switch	hint:Takes a branch
-dbr	branch -d	delete a merged branch	hint:Takes a branch
-mg	merge	merge a branch into this one	hint:Takes a branch
-copy|cp	fn:copy	copy a commit onto a branch	hint:Takes a handle, then a branch
 
 # --- Editing Commits ---
 amend	fn:amend	fold staged changes into HEAD, or into a commit	hint:Takes a handle
+copy|cp	fn:copy	copy a commit onto a branch	hint:Takes a handle, then a branch
 reword|rename|describe|desc	fn:reword	edit the message of a commit	hint:Takes a handle
 split	fn:split	cut one commit in two	hint:Takes a handle, then -- paths
 squash	fn:squash	fold a commit into its parent	hint:Takes a handle
@@ -47,31 +47,30 @@ absorb	absorb	fold changes into the right commit
 abandon	fn:abandon	drop one commit, replay its descendants	hint:Takes a handle
 edit	fn:edit	stop a rebase at a commit	hint:Takes a handle
 
+# --- Branching ---
+br	branch	list branches
+sw	switch	change branch	hint:Takes a branch
+cbr	switch -c	create and switch	hint:Takes a branch
+dbr	branch -d	delete a merged branch	hint:Takes a branch
+mg	merge	merge a branch into this one	hint:Takes a branch
+wt	fn:wt	parallel branches, one worktree each	hint:Takes new|ls|rm
+
 # --- Operations ---
 reflog	reflog	where HEAD has been
 undo	reset --soft refs/gg/undo/prev	reset to the previous snapshot
 continue	fn:continue	resume a stopped rebase
 abort	fn:abort	abort whichever operation is stuck
+re	reset	move HEAD	hint:Takes a ref
 
 # --- Remote ---
 update|up	fn:update	fetch and rebase on the upstream
 push|pu	fn:push	push, refuse on drift
 sync	fn:sync	rebase on a branch, then push	hint:Takes a branch
 
-# --- Worktrees ---
-wt	fn:wt	parallel branches, one worktree each	hint:Takes new|ls|rm
-
 # --- Tools ---
 story	tool:gitlogue	animated history replay
 mzt	tool:git-machete	branch layout maintenance
 sim	tool:git-sim	render an operation before running
-
-# --- Others ---
 hooks	fn:hooks	install the Change-Id hook
-re	reset	move HEAD	hint:Takes a ref
-cl	restore --source=HEAD --staged --worktree .	wipe tree and index
-cl-wd	restore --source=HEAD --worktree .	wipe the working tree
-cl-sa	restore --source=HEAD --staged	wipe the index	hidden
-raw	raw	run git with any arguments, still undoable	nogit
-id	id	resolve a handle to a sha	nogit
 tools	tools	external tools and their install state	nogit
+raw	raw	run git with any arguments, still undoable	nogit
