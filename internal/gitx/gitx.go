@@ -98,6 +98,40 @@ func Prev() (string, bool) {
 	return sha, true
 }
 
+// WipRef marks the working-copy commit that gg new creates.
+const WipRef = "refs/gg/wip"
+
+// WipSha returns the wip commit when the marker exists.
+func WipSha() (string, bool) {
+	sha, err := Output("rev-parse", "--verify", "--quiet", WipRef)
+	if err != nil || sha == "" {
+		return "", false
+	}
+	return sha, true
+}
+
+// InWip reports whether HEAD is the wip commit.
+func InWip() bool {
+	head, ok := Head()
+	if !ok {
+		return false
+	}
+	wip, ok := WipSha()
+	return ok && wip == head
+}
+
+// MarkWip points the marker at HEAD.
+func MarkWip() { _, _ = Output("update-ref", WipRef, "HEAD") }
+
+// DropWip deletes the marker.
+func DropWip() { _, _ = Output("update-ref", "-d", WipRef) }
+
+// Dirty reports whether the working tree has changes.
+func Dirty() bool {
+	out, err := Output("status", "--porcelain")
+	return err == nil && out != ""
+}
+
 // Upstream returns the full upstream ref, e.g. origin/main.
 func Upstream() (string, bool) {
 	name, err := Output("rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}")

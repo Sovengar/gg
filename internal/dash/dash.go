@@ -75,8 +75,8 @@ func header(idx *ids.Index, sha string) {
 		ui.Cyan(branch),
 		ui.Red(idx.Handle(sha)), ui.Dim(sha[:7]),
 		ui.Green("↑"+ahead), ui.Yellow("↓"+behind))
-	if stashes, err := gitx.OutputAll("stash", "list"); err == nil && len(stashes) > 0 {
-		line += "  " + ui.Magenta(fmt.Sprintf("stash %d", len(stashes)))
+	if gitx.InWip() {
+		line += "  " + ui.Magenta("wip")
 	}
 	fmt.Println(line)
 }

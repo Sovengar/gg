@@ -61,15 +61,10 @@ update|up	fn:update	fetch and rebase on the upstream
 push|pu	fn:push	push, refuse on drift
 sync	fn:sync	rebase on a branch, then push	hint:Takes a branch
 
-# --- Stash ---
-stasha	stash --include-untracked	stash tree and untracked files
-stashs	stash show --text	show the top stash
-
 # --- Tools ---
 story	tool:gitlogue	animated history replay
 mzt	tool:git-machete	branch layout maintenance
 sim	tool:git-sim	render an operation before running
-wip	tool:git-wip	save or inspect work in progress
 wt	tool:wt	worktree management
 
 # --- Others ---
