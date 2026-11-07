@@ -157,7 +157,7 @@ func stopAt(commit, action string) int {
 	dir, err := gitx.Output("rev-parse", "--git-path", "rebase-merge")
 	if err == nil {
 		if _, statErr := os.Stat(dir); statErr == nil {
-			ui.Errf("gg: a rebase is already in progress; use gg continue or gg arb")
+			ui.Errf("gg: a rebase is already in progress; use gg continue or gg abort")
 			return 1
 		}
 	}

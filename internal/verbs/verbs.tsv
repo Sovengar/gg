@@ -51,8 +51,6 @@ reflog	reflog	where HEAD has been
 undo	reset --soft refs/gg/undo/prev	reset to the previous snapshot
 continue	fn:continue	resume a stopped rebase
 abort	fn:abort	abort whichever operation is stuck
-arb	rebase --abort	abort the rebase
-amg	merge --abort	abort the merge
 
 # --- Remote ---
 update|up	fn:update	fetch and rebase on the upstream
