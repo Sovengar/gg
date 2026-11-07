@@ -84,11 +84,27 @@ if [ -f f.txt ]; then ok "undo keeps files"; else no "undo keeps files"; fi
 echo "uncommit"
 R=$(newrepo)
 cd "$R" || exit 1
-"$BIN" c --allow-empty -m one >/dev/null
-"$BIN" c --allow-empty -m two >/dev/null
-"$BIN" uncommit 2 >/dev/null
-assert_eq "uncommit 2 of 3" "$(git log --oneline | wc -l | tr -d ' ')" "1"
-if "$BIN" uncommit 99 2>/dev/null; then no "uncommit guards count"; else ok "uncommit guards count"; fi
+echo one > a.txt
+git add . >/dev/null 2>&1
+git commit -q -m one
+"$BIN" uncommit >/dev/null
+assert_eq "uncommit drops HEAD" "$(git log --oneline | wc -l | tr -d ' ')" "1"
+assert_eq "uncommit keeps the change" "$(git status --porcelain)" "?? a.txt"
+git add . >/dev/null 2>&1
+git commit -q -m one
+echo two > b.txt
+git add . >/dev/null 2>&1
+git commit -q -m two
+"$BIN" uncommit >/dev/null
+assert_eq "uncommit keeps tree dirty" "$(git status --porcelain)" "?? b.txt"
+git add . >/dev/null 2>&1
+git commit -q -m two
+h=$(NO_COLOR=1 "$BIN" log 2 | awk '$5=="one"{print $2}')
+"$BIN" uncommit "$h" >/dev/null 2>&1
+assert_eq "uncommit by id removes that commit" "$(git log --oneline | wc -l | tr -d ' ')" "2"
+assert_eq "uncommit by id keeps HEAD on top" "$(git log --format=%s -1)" "two"
+assert_eq "uncommit by id hands the change back" "$(git status --porcelain)" "?? a.txt"
+if "$BIN" uncommit nope 2>/dev/null; then no "uncommit guards unknown ids"; else ok "uncommit guards unknown ids"; fi
 
 echo "bare gg and handles"
 R=$(newrepo)
@@ -292,7 +308,7 @@ assert_eq "copy comes back to the first branch" "$(git rev-parse --abbrev-ref HE
 assert_eq "copy lands on the target branch" "$(git log --format=%s -1 other)" "one"
 assert_eq "copy leaves the first branch alone" "$(git log --format=%s -1 HEAD)" "one"
 assert_eq "copy counted once on the target" "$(git rev-list --count other)" "2"
-h=$(NO_COLOR=1 "$BIN" log 2 | awk '$3=="init"{print $2}')
+h=$(NO_COLOR=1 "$BIN" log 2 | awk '$5=="init"{print $2}')
 "$BIN" cp "$h" other >/dev/null 2>&1
 assert_contains "cp is still an alias" "$("$BIN" -p copy "$h" other)" "gg copy"
 if "$BIN" copy "$h" nope >/dev/null 2>&1; then no "copy refuses an unknown branch"; else ok "copy refuses an unknown branch"; fi

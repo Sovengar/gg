@@ -41,7 +41,8 @@ gg amend <id>      fold your edits into another commit (git history fixup)
 gg reword <id>     edit that commit's message (aliases: rename, describe, desc)
 gg split <id> -- f cut that commit in two by paths (git history split, interactive)
 gg abandon <id>    drop that commit (git history drop)
-gg uncommit 2      move the last 2 commits back into the working copy
+gg uncommit        move HEAD back into the working copy, change and all
+gg uncommit <id>   same for any commit, its children replayed on its parent
 gg wt new side     a worktree for a branch, one directory each
 gg wt ls           each worktree, its path and how dirty it is
 gg wt rm side      remove it, --force when dirty

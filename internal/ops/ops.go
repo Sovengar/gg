@@ -2,7 +2,7 @@
 package ops
 
 import (
-	"strconv"
+	"os"
 	"strings"
 
 	"gg/internal/gitx"
@@ -114,20 +114,98 @@ func ask(up string, args []string) int {
 	}
 }
 
-// Uncommit moves the last N commits back into the working copy.
+// Uncommit moves commits back into the working tree: the change stays, the
+// commit goes, and its descendants are replayed on top. With no argument it
+// uncommits HEAD, the way but does.
 func Uncommit(args []string) int {
-	n := 1
-	if len(args) > 0 {
-		parsed, err := strconv.Atoi(args[0])
-		if err != nil || parsed < 1 {
-			ui.Errf("gg: uncommit takes a positive count, got %q", args[0])
-			return 2
-		}
-		n = parsed
+	if len(args) == 0 {
+		return uncommitHead()
 	}
-	if _, err := gitx.Output("rev-parse", "--verify", "--quiet", "HEAD~"+strconv.Itoa(n)); err != nil {
-		ui.Errf("gg: not enough history to uncommit %d commit(s)", n)
+	for _, arg := range args {
+		if rc := uncommitOne(arg); rc != 0 {
+			return rc
+		}
+	}
+	return 0
+}
+
+// uncommitHead drops HEAD and leaves its change in the tree, unstaged: gg has
+// no staging step, so nothing may arrive in the index.
+func uncommitHead() int {
+	if _, err := gitx.Output("rev-parse", "--verify", "--quiet", "HEAD~1"); err != nil {
+		ui.Errf("gg uncommit: HEAD has no parent to uncommit into")
 		return 1
 	}
-	return gitx.Run("reset", "--soft", "HEAD~"+strconv.Itoa(n))
+	return gitx.Run("reset", "--quiet", "HEAD~1")
+}
+
+// uncommitOne replays the history without one commit and hands its diff back
+// to the tree. The patch is applied with three-way merge, so a later conflict
+// stops there instead of losing the change.
+func uncommitOne(arg string) int {
+	sha, err := gitx.Output("rev-parse", "--verify", "--quiet", arg+"^{commit}")
+	if err != nil {
+		ui.Errf("gg uncommit: %s is not a commit any more; rerun with a fresh handle", arg)
+		return 1
+	}
+	head, err := gitx.Output("rev-parse", "HEAD")
+	if err != nil {
+		ui.Errf("gg uncommit: cannot read HEAD")
+		return 1
+	}
+	if sha == head {
+		return uncommitHead()
+	}
+	if _, err := gitx.Output("rev-parse", "--verify", "--quiet", sha+"^2"); err == nil {
+		ui.Errf("gg uncommit: %s is a merge, uncommit one side instead", arg)
+		return 1
+	}
+	if rc := gitx.Run("merge-base", "--is-ancestor", sha, head); rc != 0 {
+		ui.Errf("gg uncommit: %s is not in the history of HEAD", arg)
+		return 1
+	}
+	if n := dirty("."); n > 0 {
+		ui.Errf("gg uncommit: the tree is dirty, commit or discard first")
+		return 1
+	}
+
+	patch, err := gitx.Output("diff", sha+"^", sha)
+	if err != nil || patch == "" {
+		ui.Errf("gg uncommit: %s carries no change to move back", arg)
+		return 1
+	}
+	file, err := os.CreateTemp("", "gg-uncommit-*.patch")
+	if err != nil {
+		ui.Errf("gg uncommit: cannot write a patch")
+		return 1
+	}
+	defer os.Remove(file.Name())
+	if _, err := file.WriteString(patch + "\n"); err != nil {
+		file.Close()
+		ui.Errf("gg uncommit: cannot write a patch")
+		return 1
+	}
+	file.Close()
+
+	if rc := gitx.Run("rebase", "--onto", sha+"^", sha); rc != 0 {
+		keepPatch(patch, file.Name())
+		return rc
+	}
+	if rc := gitx.Run("apply", "--3way", file.Name()); rc != 0 {
+		ui.Errf("gg uncommit: the change of %s did not apply cleanly; fix it by hand", arg)
+		return rc
+	}
+	return gitx.Run("reset", "--quiet")
+}
+
+// keepPatch leaves the dropped change inside .git when a rebase stopped on a
+// conflict, so the work survives the resolution.
+func keepPatch(patch, tmp string) {
+	path, err := gitx.Output("rev-parse", "--git-path", "gg-uncommit.patch")
+	if err != nil {
+		path = tmp
+	} else if writeErr := os.WriteFile(path, []byte(patch+"\n"), 0o644); writeErr != nil {
+		path = tmp
+	}
+	ui.Errf("gg uncommit: the change is kept in %s; apply it after the rebase", path)
 }
