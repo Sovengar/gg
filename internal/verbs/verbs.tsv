@@ -19,16 +19,15 @@ show	show	one commit in full	hint:Takes a handle
 files	ls-files	tracked files
 branches	branch --sort=-committerdate	branches, newest first
 
-# --- Staging ---
-a	add	stage one path	hint:Takes a path
-aa	add -A	stage everything
-ia	add --patch	stage hunk by hunk
-us	restore --staged	unstage a path	hint:Takes a path
-rs	restore	restore paths	hint:Takes a path
+# --- Changes ---
+discard|rs	fn:discard	drop changes, keep the rest	hint:Takes a handle, -a for all
+a	add	-	hidden
+aa	add -A	-	hidden
+ia	add --patch	-	hidden
+us	restore --staged	-	hidden
 
 # --- Branching and Committing ---
-commit|c	commit	record the staged changes	hint:Use -m "msg"
-ca	commit -a	record every tracked change
+commit|c|ca	fn:commit	record the named changes, all when none	hint:Use -m "msg", takes handles
 empty	commit --allow-empty	record an empty commit
 br	branch	list branches
 sw	switch	change branch	hint:Takes a branch
@@ -77,7 +76,7 @@ hooks	fn:hooks	install the Change-Id hook
 re	reset	move HEAD	hint:Takes a ref
 cl	restore --source=HEAD --staged --worktree .	wipe tree and index
 cl-wd	restore --source=HEAD --worktree .	wipe the working tree
-cl-sa	restore --source=HEAD --staged	wipe the index
+cl-sa	restore --source=HEAD --staged	wipe the index	hidden
 raw	raw	run git with any arguments, still undoable	nogit
 id	id	resolve a handle to a sha	nogit
 tools	tools	external tools and their install state	nogit

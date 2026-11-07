@@ -184,6 +184,7 @@ var pathVerbs = map[string]bool{
 	"add": true, "a": true, "aa": true, "ia": true,
 	"diff": true, "rs": true, "restore": true, "us": true,
 	"cl": true, "cl-wd": true, "cl-sa": true, "cp": true,
+	"commit": true, "c": true, "ca": true, "discard": true,
 }
 
 func pathVerb(name string) bool { return pathVerbs[name] }
