@@ -193,14 +193,18 @@ git clone -q "$BARE" "$R" 2>/dev/null
 cd "$R" || exit 1
 git commit -q --allow-empty -m one
 git push -q -u origin tb 2>/dev/null
-git commit -q --allow-empty -m two
-"$BIN" c --allow-empty -m three >/dev/null 2>&1
+# an entry whose state predates the published commit
+echo work > w.txt
+git add w.txt >/dev/null 2>&1
+"$BIN" c -m two >/dev/null 2>&1
+git commit -q --allow-empty -m published
+git push -q 2>/dev/null
 out=$("$BIN" undo 2>&1)
 rc=$?
-assert_eq "undo refuses when ahead of the upstream" "$rc" "1"
+assert_eq "undo refuses to remove a published commit" "$rc" "1"
 assert_contains "undo guard names the branch" "$out" "tb"
 assert_contains "undo guard asks for force" "$out" "--force"
-assert_eq "the refused undo leaves HEAD alone" "$(git log -1 --format=%s)" "three"
+assert_eq "the refused undo leaves HEAD alone" "$(git log -1 --format=%s)" "published"
 "$BIN" undo --force >/dev/null 2>&1
 assert_eq "undo --force bypasses the guard" "$(git log -1 --format=%s)" "two"
 
@@ -583,6 +587,8 @@ git add . >/dev/null 2>&1
 git commit -q -m one
 cid=$(NO_COLOR=1 "$BIN" log 1 | awk '{print $2}')
 sha1=$(git rev-parse HEAD)
+echo edit >> a.txt
+git add . >/dev/null 2>&1
 git commit -q --amend --no-edit
 sha2=$(git rev-parse HEAD)
 cid2=$(NO_COLOR=1 "$BIN" log 1 | awk '{print $2}')

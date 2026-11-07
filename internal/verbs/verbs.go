@@ -50,6 +50,8 @@ var functions = map[string]func([]string) int{
 	"split":        ops.Split,
 	"amend":        ops.Amend,
 	"dash":         dash.Run,
+	"tree":         dash.Tree,
+	"diff":         diffview.Run,
 	"branches":     ops.Branches,
 	"deleteBranch": ops.DeleteBranch,
 	"push":         ops.Push,
