@@ -279,6 +279,25 @@ echo fresh > d.txt
 "$BIN" discard d.txt >/dev/null 2>&1
 if [ -f d.txt ]; then no "discard deletes an untracked file"; else ok "discard deletes an untracked file"; fi
 
+echo "copy a commit onto a branch"
+R=$(newrepo)
+cd "$R" || exit 1
+git branch other
+echo one > a.txt
+git add . >/dev/null 2>&1
+git commit -q -m one
+h=$(NO_COLOR=1 "$BIN" log 1 | awk '{print $2}')
+"$BIN" copy "$h" other >/dev/null 2>&1
+assert_eq "copy comes back to the first branch" "$(git rev-parse --abbrev-ref HEAD)" "tb"
+assert_eq "copy lands on the target branch" "$(git log --format=%s -1 other)" "one"
+assert_eq "copy leaves the first branch alone" "$(git log --format=%s -1 HEAD)" "one"
+assert_eq "copy counted once on the target" "$(git rev-list --count other)" "2"
+h=$(NO_COLOR=1 "$BIN" log 2 | awk '$3=="init"{print $2}')
+"$BIN" cp "$h" other >/dev/null 2>&1
+assert_contains "cp is still an alias" "$("$BIN" -p copy "$h" other)" "gg copy"
+if "$BIN" copy "$h" nope >/dev/null 2>&1; then no "copy refuses an unknown branch"; else ok "copy refuses an unknown branch"; fi
+if "$BIN" copy >/dev/null 2>&1; then no "copy requires a handle"; else ok "copy requires a handle"; fi
+
 echo
 echo "passed $pass, failed $fail"
 [ "$fail" -eq 0 ]

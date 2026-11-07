@@ -183,7 +183,7 @@ func fileIndex() *files.Index {
 var pathVerbs = map[string]bool{
 	"add": true, "a": true, "aa": true, "ia": true,
 	"diff": true, "rs": true, "restore": true, "us": true,
-	"cl": true, "cl-wd": true, "cl-sa": true, "cp": true,
+	"cl": true, "cl-wd": true, "cl-sa": true,
 	"commit": true, "c": true, "ca": true, "discard": true,
 }
 
@@ -197,7 +197,7 @@ var wipFold = map[string]bool{
 	"sw": true, "switch": true, "cbr": true, "mg": true, "merge": true,
 	"amend": true, "absorb": true, "edit": true, "continue": true,
 	"reword": true, "rename": true, "describe": true, "desc": true,
-	"squash": true, "split": true, "move": true, "abandon": true, "cp": true,
+	"squash": true, "split": true, "move": true, "abandon": true, "copy": true, "cp": true,
 }
 
 func isRef(token string) bool {

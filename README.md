@@ -29,6 +29,8 @@ gg log -l 40       long line: relative age and author
 gg branches        branches sorted by recency
 gg reflog          reflog
 gg diff -w         diff ignoring whitespace
+gg copy kd main    copy that commit onto main, back on your branch after (alias: cp)
+gg copy kd         copy it onto the branch you are on
 gg c -m "msg"      commit every dirty path (aliases: commit, ca)
 gg c -m "msg" kd qz  commit only those handles
 gg discard kd      drop that change, keep the rest (alias: rs)

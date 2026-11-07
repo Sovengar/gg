@@ -33,7 +33,7 @@ sw	switch	change branch	hint:Takes a branch
 cbr	switch -c	create and switch	hint:Takes a branch
 dbr	branch -d	delete a merged branch	hint:Takes a branch
 mg	merge	merge a branch into this one	hint:Takes a branch
-cp	cherry-pick	copy a commit here	hint:Takes a handle
+copy|cp	fn:copy	copy a commit onto a branch	hint:Takes a handle, then a branch
 
 # --- Editing Commits ---
 amend	fn:amend	fold staged changes into HEAD, or into a commit	hint:Takes a handle
