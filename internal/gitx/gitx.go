@@ -82,22 +82,6 @@ func ShortHead() (string, bool) {
 	return sha, true
 }
 
-// Snapshot stores HEAD in refs/gg/undo/prev so that undo can return here.
-func Snapshot() {
-	if sha, ok := Head(); ok {
-		_, _ = Output("update-ref", "refs/gg/undo/prev", sha)
-	}
-}
-
-// Prev returns the commit saved by the last Snapshot.
-func Prev() (string, bool) {
-	sha, err := Output("rev-parse", "--verify", "--quiet", "refs/gg/undo/prev")
-	if err != nil || sha == "" {
-		return "", false
-	}
-	return sha, true
-}
-
 // WipRef marks the working-copy commit that gg new creates.
 const WipRef = "refs/gg/wip"
 

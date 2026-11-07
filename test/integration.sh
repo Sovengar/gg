@@ -81,6 +81,48 @@ assert_contains "footer printed" "$("$BIN" c --allow-empty -m footer 2>&1)" "ahe
 assert_eq "undo went back" "$(git log --oneline | wc -l | tr -d ' ')" "2"
 if [ -f f.txt ]; then ok "undo keeps files"; else no "undo keeps files"; fi
 
+echo "oplog, undo and redo"
+R=$(newrepo)
+cd "$R" || exit 1
+echo keep > tracked.txt
+git add tracked.txt >/dev/null 2>&1
+git commit -q -m tracked
+echo edit >> tracked.txt
+echo fresh > untracked.txt
+"$BIN" discard -a >/dev/null 2>&1
+assert_contains "oplog lists the verb" "$("$BIN" oplog)" "discard"
+assert_eq "discard restored the tracked file" "$(cat tracked.txt)" "keep"
+if [ -f untracked.txt ]; then no "discard deleted the untracked file"; else ok "discard deleted the untracked file"; fi
+"$BIN" undo >/dev/null 2>&1
+assert_contains "undo restores the discarded tracked file" "$(cat tracked.txt)" "edit"
+if [ -f untracked.txt ]; then ok "undo restores the deleted untracked file"; else no "undo restores the deleted untracked file"; fi
+
+R=$(newrepo)
+cd "$R" || exit 1
+echo a > a.txt
+"$BIN" c -m c1 >/dev/null 2>&1
+echo b > b.txt
+"$BIN" c -m c2 >/dev/null 2>&1
+assert_eq "two operations before undo" "$(git rev-list --count HEAD)" "3"
+"$BIN" undo 2 >/dev/null 2>&1
+assert_eq "undo 2 goes back two entries" "$(git rev-list --count HEAD)" "1"
+if [ -f a.txt ]; then ok "undo 2 restores the older worktree"; else no "undo 2 restores the older worktree"; fi
+if [ -f b.txt ]; then no "undo 2 drops the newer worktree"; else ok "undo 2 drops the newer worktree"; fi
+"$BIN" redo >/dev/null 2>&1
+assert_eq "redo restores the commits" "$(git rev-list --count HEAD)" "3"
+if [ -f b.txt ]; then ok "redo restores the newer worktree"; else no "redo restores the newer worktree"; fi
+"$BIN" undo 2 >/dev/null 2>&1
+"$BIN" c --allow-empty -m after-undo >/dev/null 2>&1
+out=$("$BIN" redo 2>&1)
+assert_contains "new work after undo drops redo" "$out" "nothing to redo"
+
+R=$(newrepo)
+cd "$R" || exit 1
+for i in $(seq 1 105); do
+	"$BIN" c --allow-empty -m "op$i" >/dev/null 2>&1
+done
+assert_eq "oplog keeps the newest 100 entries" "$("$BIN" oplog | wc -l | tr -d ' ')" "100"
+
 echo "uncommit"
 R=$(newrepo)
 cd "$R" || exit 1

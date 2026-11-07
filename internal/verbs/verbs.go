@@ -3,11 +3,14 @@ package verbs
 
 import (
 	_ "embed"
+	"strconv"
 	"strings"
 
 	"gg/internal/dash"
 	"gg/internal/hist"
+	"gg/internal/oplog"
 	"gg/internal/ops"
+	"gg/internal/ui"
 )
 
 //go:embed verbs.tsv
@@ -63,13 +66,33 @@ var functions = map[string]func([]string) int{
 	"commit":   ops.Commit,
 	"discard":  ops.Discard,
 	"copy":     ops.Copy,
+	"undo":     undo,
+	"redo":     redo,
+	"oplog":    oplogList,
 }
 
-// mutating verbs get a snapshot and a footer.
+func undo(args []string) int {
+	n := 1
+	if len(args) > 0 {
+		v, err := strconv.Atoi(args[0])
+		if err != nil || v < 1 {
+			ui.Errf("gg undo: the count must be a positive number")
+			return 2
+		}
+		n = v
+	}
+	return oplog.Undo(n)
+}
+
+func redo(args []string) int { return oplog.Redo() }
+
+func oplogList(args []string) int { return oplog.List() }
+
+// mutating verbs get an oplog entry and a footer.
 var mutating = map[string]bool{
 	"commit": true, "c": true, "ca": true, "amend": true, "uncommit": true,
 	"split": true, "squash": true, "absorb": true, "empty": true,
-	"move": true, "publish": true, "sync": true, "update": true, "undo": true,
+	"move": true, "publish": true, "sync": true, "update": true,
 	"abandon": true, "copy": true, "cp": true, "push": true, "pu": true, "up": true,
 	"edit": true, "continue": true, "hooks": true, "abort": true, "wt": true,
 	"new": true, "discard": true, "rs": true,

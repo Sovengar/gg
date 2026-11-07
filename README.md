@@ -33,7 +33,7 @@ gg copy kd main    copy that commit onto main, back on your branch after (alias:
 gg copy kd         copy it onto the branch you are on
 gg c -m "msg"      commit every dirty path (aliases: commit, ca)
 gg c -m "msg" kd qz  commit only those handles
-gg discard kd      drop that change, keep the rest (alias: rs)
+gg discard kd      drop that change, keep the rest (alias: rs); undoable with gg undo
 gg discard -a      drop everything
 gg new             save the changes, then absorb more until you commit
 gg amend           fold changes into HEAD
@@ -52,8 +52,11 @@ gg push / gg pu    push, refuse on drift, offer force-with-lease
 gg sync <branch>   pull --rebase origin <branch>, then push
 gg sync            fails: the branch argument is required
 gg abort           abort whichever operation is stuck: rebase, merge, cherry-pick
-gg undo            reset --soft to the last snapshot
-gg raw log -5      anything goes, still snapshotted
+gg undo            step back to the state before the last operation
+gg undo 3          step back three operations
+gg redo            step forward again after an undo
+gg oplog           the operations undo can reach
+gg raw log -5      anything goes, still recorded
 gg help            verb table (alias: h)
 gg help -all       verb table + the git command behind each verb
 gg tools           external tools + install state
@@ -204,7 +207,11 @@ interactive rebase on that commit, you amend it, and `gg continue` resumes.
 
 ## Semantics
 
-- Every mutating verb snapshots `HEAD` into `refs/gg/undo/prev`, so one `gg undo` reverts any of them.
+- Every mutating verb records an oplog entry before it runs: HEAD and the full worktree
+  (tracked and untracked, `.gitignore` respected). `gg oplog` lists them newest first,
+  `gg undo` restores the state before the last operation, `gg undo N` goes back N
+  entries, and `gg redo` moves forward again when the last action was an undo. This
+  also makes `gg discard` revertible. The newest 100 entries are kept.
 - Every mutating verb ends with a footer: `@ <sha> · ahead N · behind M`.
 - `gg push` never force-pushes on its own. It reports the drift, lists the incoming
   commits, and asks: update, force-with-lease, or abort. Non-interactive runs refuse.
@@ -213,9 +220,10 @@ interactive rebase on that commit, you amend it, and `gg continue` resumes.
 ## Layout
 
 ```
-main.go                 dispatch, flags, footer, undo, raw
+main.go                 dispatch, flags, footer, raw
 internal/verbs/         registry (verbs.tsv embedded) + resolution
 internal/gitx/          git binary wrapper
+internal/oplog/         worktree snapshots, undo and redo
 internal/hist/          graph renderer with pager
 internal/ops/           push guard, update, sync, uncommit
 internal/ui/            colour, prompts, tty detection

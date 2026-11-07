@@ -35,7 +35,7 @@ type Index struct {
 
 // Load scans the history once and builds the index.
 func Load() (*Index, error) {
-	// only refs a user can reach: refs/gg/undo and refs/stash would repeat
+	// only refs a user can reach: refs/gg/oplog and refs/stash would repeat
 	// rewritten commits and split one Change-Id across two shas
 	lines, err := gitx.OutputAll("log", "--branches", "--tags", "--remotes", "HEAD",
 		"--format=%H%x1f%(trailers:key=Change-Id,valueonly)", "-n", "2000")

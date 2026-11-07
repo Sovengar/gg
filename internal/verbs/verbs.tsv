@@ -4,7 +4,7 @@
 # A "hint:" field adds a grey parameter note after the description.
 # Flags: "hidden" hides the row, "display:..." overrides the name column,
 # "nogit" hides the git command in help -all (verbs dispatched by main's switch).
-# Mutating verbs get a snapshot in refs/gg/undo/prev plus a footer.
+# Mutating verbs get an oplog entry plus a footer.
 # Section headers ("# --- name ---") become the categories in gg help.
 
 # --- Inspection ---
@@ -20,24 +20,26 @@ branches	branch --sort=-committerdate	branches, newest first
 id	id	resolve a handle to a sha	nogit
 
 # --- Changes ---
-discard|rs	fn:discard	drop changes, keep the rest	hint:Takes a handle, -a for all
 a	add	-	hidden
 aa	add -A	-	hidden
 ia	add --patch	-	hidden
 us	restore --staged	-	hidden
 
+
+# --- Rollback work ---
+discard|rs	fn:discard	drop changes, keep the rest	hint:Takes a handle, -a for all
 cl	restore --source=HEAD --staged --worktree .	wipe tree and index
 cl-wd	restore --source=HEAD --worktree .	wipe the working tree
 cl-sa	restore --source=HEAD --staged	wipe the index	hidden
+uncommit	fn:uncommit	move commits back into the tree	hint:Takes handles, HEAD by default
+abandon	fn:abandon	drop one commit, replay its descendants	hint:Takes a handle
 
 # --- Register work ---
 commit|c|ca	fn:commit	save the changes you name, or all of them	hint:Add a message with -m. A handle names one change.
 new	fn:new	save the changes, absorb more until you commit	hint:Add a message with -m.
 empty	commit --allow-empty	record an empty commit
 copy|cp	fn:copy	copy a commit onto a branch	hint:Takes a handle, then a branch
-uncommit	fn:uncommit	move commits back into the tree	hint:Takes handles, HEAD by default
 absorb	absorb	fold changes into the right commit
-abandon	fn:abandon	drop one commit, replay its descendants	hint:Takes a handle
 
 # --- Edit saved work ---
 amend	fn:amend	fold changes into HEAD, or into a commit	hint:Takes a handle
@@ -57,9 +59,11 @@ wt	fn:wt	parallel branches, one worktree each	hint:Takes new|ls|rm
 
 # --- Operations ---
 reflog	reflog	where HEAD has been
-undo	reset --soft refs/gg/undo/prev	reset to the previous snapshot
+undo	fn:undo	step back to the previous state	hint:Takes a count, 1 by default
 continue	fn:continue	resume a stopped rebase
 abort	fn:abort	abort whichever operation is stuck
+redo	fn:redo	step forward again after an undo
+oplog	fn:oplog	the operations undo can reach
 re	reset	move HEAD	hint:Takes a ref
 
 # --- Remote ---

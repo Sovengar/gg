@@ -11,6 +11,7 @@ import (
 	"gg/internal/files"
 	"gg/internal/gitx"
 	"gg/internal/ids"
+	"gg/internal/oplog"
 	"gg/internal/ops"
 	"gg/internal/ui"
 	"gg/internal/verbs"
@@ -68,13 +69,11 @@ func run(argv []string) int {
 			return 2
 		}
 		return execArgv(args[1:], "raw", m)
-	case "undo":
-		return undo(m)
 	}
 
 	name := args[0]
 	rest := args[1:]
-	if name != "raw" {
+	if !noResolve[name] {
 		resolved, rc := resolveArgs(name, rest)
 		if rc != 0 {
 			return rc
@@ -84,7 +83,7 @@ func run(argv []string) int {
 
 	entry, ok := verbs.Lookup(name)
 	if !ok {
-		// unknown verb: straight to git, still snapshotted by the mutating set
+		// unknown verb: straight to git, still recorded by the mutating set
 		return execArgv(append([]string{name}, rest...), name, m)
 	}
 	if entry.IsFunc() {
@@ -189,6 +188,11 @@ var pathVerbs = map[string]bool{
 
 func pathVerb(name string) bool { return pathVerbs[name] }
 
+// noResolve are verbs whose arguments are not handles.
+var noResolve = map[string]bool{
+	"raw": true, "undo": true, "redo": true, "oplog": true,
+}
+
 // wipFold lists the verbs that fold uncommitted edits into an active wip
 // commit before they run. Path-scoped verbs are never listed: they address the
 // tree themselves and folding first would hand them the wrong base.
@@ -210,22 +214,13 @@ func isPath(token string) bool {
 	return err == nil
 }
 
-func undo(m mode) int {
-	prev, ok := gitx.Prev()
-	if !ok {
-		ui.Errf("gg: nothing to undo")
-		return 1
-	}
-	return execArgv([]string{"reset", "--soft", prev}, "undo", m)
-}
-
 func execArgv(argv []string, verb string, m mode) int {
 	if m == modePrint {
 		fmt.Println("git " + quote(argv))
 		return 0
 	}
 	if verbs.IsMutating(verb) {
-		gitx.Snapshot()
+		oplog.Record(verb)
 	}
 	if wipFold[verb] {
 		ops.WipAmend()
@@ -244,7 +239,7 @@ func execFunc(entry verbs.Entry, typed string, rest []string, m mode) int {
 		return 0
 	}
 	if verbs.IsMutating(entry.Name) {
-		gitx.Snapshot()
+		oplog.Record(entry.Name)
 	}
 	if wipFold[entry.Name] {
 		ops.WipAmend()
@@ -264,7 +259,7 @@ func execTool(entry verbs.Entry, rest []string, m mode) int {
 		return 0
 	}
 	if verbs.IsMutating(entry.Name) {
-		gitx.Snapshot()
+		oplog.Record(entry.Name)
 	}
 	if wipFold[entry.Name] {
 		ops.WipAmend()
