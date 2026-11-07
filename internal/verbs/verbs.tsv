@@ -16,7 +16,6 @@ log	fn:log	graph log, 6 commits by default	hint:Takes a count, -l for long lines
 dash	fn:dash	dashboard: branch, files, commits	hidden
 diff	diff	diff the tree	hint:Use -w to ignore whitespace
 show	show	one commit in full	hint:Takes a handle
-files	ls-files	tracked files
 branches	branch --sort=-committerdate	branches, newest first
 
 # --- Changes ---

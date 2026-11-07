@@ -26,7 +26,6 @@ gg stf             status including untracked
 gg log             short graph log, 6 commits by default, ✓ pushed / ↑ local
 gg log 20          more of it, extra args go to git log
 gg log -l 40       long line: relative age and author
-gg files           ls-files
 gg branches        branches sorted by recency
 gg reflog          reflog
 gg diff -w         diff ignoring whitespace

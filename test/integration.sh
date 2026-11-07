@@ -151,7 +151,6 @@ assert_contains "reword prints" "$("$BIN" -p reword ab)" "gg reword ab"
 assert_contains "split prints" "$("$BIN" -p split ab -- f.txt)" "gg split ab -- f.txt"
 
 echo "renamed verbs"
-assert_contains "files verb" "$("$BIN" -p files)" "ls-files"
 assert_contains "reflog verb" "$("$BIN" -p reflog)" "reflog"
 assert_contains "branches verb" "$("$BIN" -p branches)" "branch --sort"
 assert_contains "log alias renders" "$("$BIN" -p log 3)" "gg log 3"
