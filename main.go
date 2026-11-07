@@ -188,6 +188,17 @@ var pathVerbs = map[string]bool{
 
 func pathVerb(name string) bool { return pathVerbs[name] }
 
+// wipFold lists the verbs that fold uncommitted edits into an active wip
+// commit before they run. Path-scoped verbs are never listed: they address the
+// tree themselves and folding first would hand them the wrong base.
+var wipFold = map[string]bool{
+	"update": true, "up": true, "sync": true, "push": true, "pu": true,
+	"sw": true, "switch": true, "cbr": true, "mg": true, "merge": true,
+	"amend": true, "absorb": true, "edit": true, "continue": true,
+	"reword": true, "rename": true, "describe": true, "desc": true,
+	"squash": true, "split": true, "move": true, "abandon": true, "cp": true,
+}
+
 func isRef(token string) bool {
 	_, err := gitx.Output("rev-parse", "--verify", "--quiet", token)
 	return err == nil
@@ -214,6 +225,9 @@ func execArgv(argv []string, verb string, m mode) int {
 	}
 	if verbs.IsMutating(verb) {
 		gitx.Snapshot()
+		if wipFold[verb] {
+			ops.WipAmend()
+		}
 	}
 	if os.Getenv("GG_ECHO") != "" {
 		ui.Errf("+ git %s", quote(argv))
@@ -230,6 +244,9 @@ func execFunc(entry verbs.Entry, typed string, rest []string, m mode) int {
 	}
 	if verbs.IsMutating(entry.Name) {
 		gitx.Snapshot()
+		if wipFold[entry.Name] {
+			ops.WipAmend()
+		}
 	}
 	if os.Getenv("GG_ECHO") != "" {
 		ui.Errf("+ gg %s", strings.TrimSpace(typed+" "+quote(rest)))
@@ -247,6 +264,9 @@ func execTool(entry verbs.Entry, rest []string, m mode) int {
 	}
 	if verbs.IsMutating(entry.Name) {
 		gitx.Snapshot()
+		if wipFold[entry.Name] {
+			ops.WipAmend()
+		}
 	}
 	if os.Getenv("GG_ECHO") != "" {
 		ui.Errf("+ %s", quote(append([]string{entry.Tool}, argv...)))
