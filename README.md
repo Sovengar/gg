@@ -92,8 +92,9 @@ lines wrap at `COLUMNS`, 80 by default. A shorthand sits grey next to its verb,
 no parentheses: `describe desc`, `commit c`. A real alias goes on the arrow
 line.
 `gg hh` merges each flag variant into the cell of the verb it flags, name and
-flag together: `status st, -a sta, -f stf`, `branch br, -r, -a, -g, <name>, -c
-cbr, -d dbr, -D Dbr`. A variant lives on one row, its parameters in `hh -v`.
+flag together: `status st, -a sta, -f stf`, `branch br, -r, -a, -g, -c
+cbr, -d dbr, -D Dbr`. A variant lives on one row, its parameters in `hh -v`,
+and a positional row with no flag of its own (`branch <name>`) stays there.
 `gg h -v` prints one row per verb with its description, no parameters.
 `gg hh -v` prints one row per verb and flag variant, with the grey parameter
 hint: `status -a sta  st -a shows all, st -f stops at five`.

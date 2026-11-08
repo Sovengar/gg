@@ -577,6 +577,9 @@ func helpTable(merged bool) int {
 
 // variantExtras maps a verb to the flags its variant rows carry, in registry
 // order: status -> "-a sta", "-f stf".
+// variantExtras maps a verb to the flags its variant rows carry, in registry
+// order: status -> "-a sta", "-f stf". A row that is only a positional
+// argument, like branch <name>, has no flag to merge and stays in hh -v.
 func variantExtras() map[string][]string {
 	extras := make(map[string][]string)
 	for _, e := range verbs.All() {
@@ -587,9 +590,11 @@ func variantExtras() map[string][]string {
 		if !ok {
 			continue
 		}
-		if flag := e.VariantFlag(); flag != "" {
-			extras[parent.Name] = append(extras[parent.Name], flag)
+		flag := e.VariantFlag()
+		if flag == "" || strings.HasPrefix(flag, "<") {
+			continue
 		}
+		extras[parent.Name] = append(extras[parent.Name], flag)
 	}
 	return extras
 }
