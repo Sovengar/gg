@@ -295,6 +295,12 @@ assert_lacks "st lists no files" "$("$BIN" st)" " more"
 assert_contains "stf marks the capped file list" "$("$BIN" stf)" "+2 more"
 assert_eq "stf lists five changed files" "$("$BIN" stf | grep -c '^┊   [AMD] ')" "5"
 
+R=$(newrepo)
+cd "$R" || exit 1
+for i in 1 2 3; do echo "$i" > "g$i.txt"; git add . >/dev/null 2>&1; git commit -q -m "c$i"; done
+assert_eq "st shows the branch commits on the default branch" "$("$BIN" st | grep -c '^┊●')" "4"
+assert_contains "stf lists the files of those commits" "$("$BIN" stf)" "A g3.txt"
+
 echo "aliases and abort"
 R=$(newrepo)
 cd "$R" || exit 1

@@ -238,9 +238,11 @@ Hint: commits are listed newest first. The first token on each line is the chang
 Hint: run `gg diff` to see uncommitted changes and `gg c -m "message"` to commit them
 ```
 
-Untracked paths read `A`, like a branch that adds the file. A lane with nothing
-above the base prints `(at the common base)`, so the default branch always keeps
-its row in the dashboard. The base is the merge base with `gitbutler/target`,
+Untracked paths read `A`, like a branch that adds the file. The current branch
+lane always carries commits: when the branch sits on the base it lists its own
+last commits instead of an empty range. Another lane with nothing above the base
+prints `(at the common base)`, so the default branch always keeps its row in the
+dashboard. The base is the merge base with `gitbutler/target`,
 the default branch or the upstream. `gg st 10` overrides how many commits each
 lane lists; gitbutler's own refs never become lanes.
 

@@ -246,7 +246,12 @@ func lanesOf(sha string, n int, opt view) ([]lane, string) {
 			lanes = append(lanes, lane{name: name, tip: tip, commits: hist.BranchLines(tip, "", n)})
 			continue
 		}
-		lanes = append(lanes, lane{name: name, tip: tip, commits: hist.BranchLines(tip, base, n)})
+		commits := hist.BranchLines(tip, base, n)
+		// a branch already sitting on the base still shows its own last commits
+		if len(commits) == 0 && i == 0 {
+			commits = hist.BranchLines(tip, "", n)
+		}
+		lanes = append(lanes, lane{name: name, tip: tip, commits: commits})
 	}
 	// a lane with nothing above the base adds no row: but prints only the base.
 	// the default view keeps it, so the default branch always has its lane.
