@@ -29,15 +29,16 @@ changeId|id	id	resolve a changeId to a sha	nogit
 discard|d	fn:discard	drop edits, keep new files	hint:Bare drops all. Takes a changeId or a path
 clear|cl	fn:clear	drop edits and new files, back to HEAD	hint:Asks before deleting new files, -f skips
 uncommit|uc	fn:uncommit	move commits back into the tree	hint:Takes changeIds, HEAD by default
-abandon|ab	fn:abandon	drop one commit, replay its descendants	hint:Takes a changeId
+abandon	fn:abandon	drop one commit, replay its descendants	hint:Takes a changeId
 revert|rv	fn:revert	undo one commit with a new commit	hint:Takes a changeId, -m N for a merge
 
 # --- Register work ---
-commit|c|ca	fn:commit	save the changes you name, or all of them	hint:Add a message with -m. A changeId names one change.
+commit|c	fn:commit	save the changes you name, or all of them	hint:Add a message with -m. A changeId names one change.
+ca	fn:commit	save every change, the way commit already does	hint:-a is implied, the flag is accepted	variant	display:commit -a ca
 new	fn:new	save the changes, absorb more until you commit	hint:Add -m <msg>. --force rewrites a pushed wip.
 empty	commit --allow-empty	record an empty commit
 copy|cp	fn:copy	copy a commit onto a branch	hint:Takes a changeId, then a branch
-absorb	absorb	fold changes into the right commit
+absorb|ab	absorb	fold changes into the right commit
 
 # --- Edit saved work ---
 amend	fn:amend	fold changes into HEAD, or into a commit	hint:Takes a changeId
@@ -48,7 +49,7 @@ move|mv	fn:move	replay a commit onto another base	hint:Takes a changeId
 edit|e	fn:edit	stop a rebase at a commit	hint:Takes a changeId
 
 # --- Branching ---
-branch switch	fn:branches	change branch	hint:Takes a branch	display:branch	displayonly
+branch switch	fn:branches	change branch	hint:Takes a branch	display:branch <name>	variant
 cbr	switch -c	branch new and switch	hint:Takes a branch. branch new <name> works too	display:branch -c cbr	variant
 dbr	fn:deleteBranch	delete a branch, tip kept in a ref	hint:Safe: unmerged commits stay. Takes a branch or a changeId	display:branch -d dbr	variant
 Dbr	fn:deleteBranchForce	delete a branch even when unmerged	hint:Force. Drops unmerged commits, keeps the tip ref	display:branch -D Dbr	variant

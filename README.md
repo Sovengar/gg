@@ -38,7 +38,7 @@ gg diff            diff in boxes, one per change (plain git diff when piped)
 gg diff -w         diff ignoring whitespace
 gg copy kd main    copy that commit onto main, back on your branch after (alias: cp)
 gg copy kd         copy it onto the branch you are on
-gg c -m "msg"      commit every dirty path (aliases: commit, ca)
+gg c -m "msg"      commit every dirty path (alias: commit; ca means commit -a)
 gg c -m "msg" kd qz  commit only those changeIds
 gg discard kd      drop that change, keep the rest; undoable with gg undo
 gg discard         drop every edit, keep the new files
@@ -82,11 +82,11 @@ Unknown verbs go straight to git: `gg log --oneline -5` runs `git log --oneline 
 Help is grouped by category: Inspection, Rollback work, Register work,
 Edit saved work, Branching, Operations, Remote, Forge, Tools, Others. There is no stash: the
 working tree, the index and wip commits are one mechanism (`gg new`, `gg wt`).
-`gg help` (or `gg h`) prints one line of names per category, then a grey `aka`
-line with that category's aliases, so the whole table stays on screen. Both
+`gg help` (or `gg h`) prints one line of names per category, then a grey line
+with that category's aliases, verb first: `reword -> rename, describe`. Both
 lines wrap at `COLUMNS`, 80 by default. A shorthand sits grey next to its verb,
-no parentheses: `reword desc`, `commit c, ca`. A real alias goes on the `aka`
-line, e.g. `aka rename · describe`.
+no parentheses: `reword desc`, `commit c`. A real alias goes on the arrow
+line.
 `gg help -p` lists the parameter hints and the flag variants, each variant named
 with the command it stands for: `status -a sta`, `status -f stf`.
 `gg help --all` prints the full table: description, grey parameter hint and the

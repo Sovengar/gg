@@ -454,12 +454,13 @@ func helpParams() int {
 	return 0
 }
 
-// helpCompact prints one line of canonical names per category, then one line of
-// aliases. Both lines stay wrapped at COLUMNS so the whole table fits on screen.
+// helpCompact prints one line of canonical names per category, then one line
+// naming the aliases of that category, verb first: "reword -> rename, describe".
+// Both lines stay wrapped at COLUMNS so the whole table fits on screen.
 func helpCompact() int {
 	var order []string
 	names := make(map[string][]cell)
-	aliases := make(map[string][]string)
+	aliases := make(map[string][]cell)
 	for _, e := range verbs.All() {
 		if e.Hidden || e.Variant {
 			continue // variants carry a flag, they belong to gg help -p
@@ -468,7 +469,9 @@ func helpCompact() int {
 			order = append(order, e.Category)
 		}
 		names[e.Category] = append(names[e.Category], displayCell(e))
-		aliases[e.Category] = append(aliases[e.Category], e.Aliases...)
+		if len(e.Aliases) > 0 {
+			aliases[e.Category] = append(aliases[e.Category], aliasCell(e))
+		}
 	}
 
 	labelWidth := 0
@@ -490,12 +493,8 @@ func helpCompact() int {
 		if len(aliases[category]) == 0 {
 			continue
 		}
-		for i, line := range wrapItems(aliases[category], width-7) {
-			prefix := indent + ui.Dim("aka    ")
-			if i > 0 {
-				prefix = indent + strings.Repeat(" ", 7)
-			}
-			fmt.Printf("%s%s\n", prefix, ui.Dim(line))
+		for _, line := range wrapCells(aliases[category], width) {
+			fmt.Printf("%s%s\n", indent, joinCells(line))
 		}
 	}
 
@@ -515,6 +514,15 @@ func displayCell(e verbs.Entry) cell {
 		styled += ui.Dim(note)
 	}
 	return cell{plain: e.Display(), styled: styled}
+}
+
+// aliasCell names one verb's aliases: the verb, an arrow and the aliases.
+func aliasCell(e verbs.Entry) cell {
+	also := strings.Join(e.Aliases, ", ")
+	return cell{
+		plain:  e.Name + " -> " + also,
+		styled: ui.Cyan(e.Name) + ui.Dim(" -> "+also),
+	}
 }
 
 // displayPadded is displayCell padded to width, padding left plain.

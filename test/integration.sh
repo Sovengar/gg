@@ -59,6 +59,7 @@ out=$("$BIN" help)
 assert_contains "help lists status" "$out" "status"
 assert_contains "help groups a shorthand under its verb" "$out" "status st"
 assert_lacks "help has no branches alias" "$out" "branches"
+assert_contains "help names the aliases verb first" "$out" "reword -> rename, describe"
 assert_contains "help keeps variants off the canonical line" "$(NO_COLOR=1 "$BIN" help | sed -n 1p)" "branch br · changeId id"
 assert_contains "params names the short status form" "$("$BIN" help -p)" "status -a sta"
 assert_contains "params names the files status form" "$("$BIN" help -p)" "status -f stf"
@@ -330,7 +331,9 @@ git commit -q --allow-empty -m second
 help=$("$BIN" help)
 assert_contains "help groups commit" "$help" "commit"
 assert_contains "help groups push" "$help" "push"
-assert_contains "help lists the commit shorthands" "$help" "commit c, ca"
+assert_contains "help lists the commit shorthand" "$help" "commit c"
+assert_contains "help lists the absorb shorthand" "$help" "absorb ab"
+assert_contains "params lists the commit -a form" "$("$BIN" help -p)" "commit -a ca"
 assert_contains "help lists the copy shorthand" "$help" "copy cp"
 assert_contains "help lists the update shorthand" "$help" "update up"
 assert_contains "help lists the push shorthand" "$help" "push p"
