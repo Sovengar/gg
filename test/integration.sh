@@ -391,6 +391,40 @@ echo abort-kept > kept.txt
 assert_eq "abort restores the branch after an edit" "$(git rev-parse --abbrev-ref HEAD)" "tb"
 assert_contains "abort keeps the edit in the worktree" "$(cat kept.txt)" "abort-kept"
 
+echo "abort --keep preserves the live changes"
+R=$(newrepo)
+cd "$R" || exit 1
+echo base > f.txt
+git add . >/dev/null 2>&1
+git commit -q -m "base file"
+echo next > g.txt
+git add . >/dev/null 2>&1
+git commit -q -m next
+keepId=$("$BIN" log 2 | tail -1 | awk '{print $2}')
+"$BIN" edit "$keepId" >/dev/null 2>&1
+echo edited >> f.txt
+echo new > added.txt
+"$BIN" abort --keep >/dev/null 2>&1
+assert_eq "abort --keep restores the branch" "$(git rev-parse --abbrev-ref HEAD)" "tb"
+assert_contains "abort --keep keeps the tracked edit" "$(cat f.txt)" "edited"
+assert_eq "abort --keep keeps the new file" "$(cat added.txt)" "new"
+
+# start the rollback case from a clean tree
+git checkout -- f.txt
+git clean -fdq
+echo "abort without --keep still rolls back"
+"$BIN" edit "$keepId" >/dev/null 2>&1
+echo edited >> f.txt
+"$BIN" abort >/dev/null 2>&1
+assert_eq "plain abort restores the branch after an edit" "$(git rev-parse --abbrev-ref HEAD)" "tb"
+assert_eq "plain abort rolls the tracked edit back" "$(cat f.txt)" "base"
+
+echo "abort --keep on a clean tree"
+"$BIN" edit "$keepId" >/dev/null 2>&1
+"$BIN" abort --keep >/dev/null 2>&1
+assert_eq "abort --keep on a clean tree restores the branch" "$(git rev-parse --abbrev-ref HEAD)" "tb"
+assert_eq "abort --keep on a clean tree leaves it clean" "$(git status --porcelain)" ""
+
 echo "git history verbs"
 R=$(newrepo)
 cd "$R" || exit 1

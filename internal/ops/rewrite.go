@@ -138,8 +138,15 @@ func Squash(args []string) int {
 }
 
 // Abort unsticks whichever operation is in progress: rebase, merge, cherry-pick
-// or revert.
+// or revert. With --keep it stashes the live edits of an aborted rebase and
+// restores them afterwards.
 func Abort(args []string) int {
+	keep := false
+	for _, a := range args {
+		if a == "--keep" || a == "-k" {
+			keep = true
+		}
+	}
 	kinds := []struct {
 		state  string
 		abort  []string
@@ -160,7 +167,17 @@ func Abort(args []string) int {
 			continue
 		}
 		ui.Errf("gg: aborting the %s", k.reason)
-		return gitx.Run(k.abort...)
+		if !keep || k.reason != "rebase" || !gitx.Dirty() {
+			return gitx.Run(k.abort...)
+		}
+		if rc := gitx.Run("stash", "push", "-u", "-m", "gg abort --keep"); rc != 0 {
+			return rc
+		}
+		rc := gitx.Run(k.abort...)
+		if popRC := gitx.Run("stash", "pop"); popRC != 0 {
+			ui.Errf("gg: your changes are in the stash (git stash list), the pop needs a manual fix")
+		}
+		return rc
 	}
 	ui.Errf("gg: nothing to abort")
 	return 1

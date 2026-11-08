@@ -60,7 +60,7 @@ wt	fn:wt	parallel branches, one worktree each	hint:Takes new|ls|rm
 reflog	reflog	where HEAD has been
 undo	fn:undo	step back to the previous state	hint:Takes a count and --force
 continue	fn:continue	resume a stopped rebase
-abort	fn:abort	abort whichever operation is stuck
+abort	fn:abort	abort whichever operation is stuck	hint:--keep preserves the live worktree changes
 redo	fn:redo	step forward again after an undo
 oplog	fn:oplog	the operations undo can reach	hint:Takes clear to drop the log
 

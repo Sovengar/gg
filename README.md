@@ -66,6 +66,7 @@ gg push / gg p     push, refuse on drift, offer force-with-lease
 gg sync <branch>   pull --rebase origin <branch>, then push
 gg sync            fails: the branch argument is required
 gg abort           abort whichever operation is stuck: rebase, merge, cherry-pick
+gg abort --keep    abort a rebase and keep the live worktree changes (short: -k)
 gg undo            step back to the state before the last operation
 gg undo 3          step back three operations
 gg redo            step forward again after an undo
