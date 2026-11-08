@@ -60,6 +60,7 @@ var functions = map[string]func([]string) int{
 	"treeAll":      dash.TreeAll,
 	"diff":         diffview.Run,
 	"branches":     ops.Branches,
+	"stack":        func([]string) int { return ops.Stack() },
 	"deleteBranch": ops.DeleteBranch,
 	"deleteBranchForce": func(args []string) int {
 		return ops.DeleteBranch(append([]string{"-D"}, args...))

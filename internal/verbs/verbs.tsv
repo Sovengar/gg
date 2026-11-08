@@ -19,9 +19,10 @@ log|l	fn:log	graph log, 6 commits by default	hint:Takes a count, -l for long lin
 dash	fn:dash	dashboard: the tree over the newest branches	hidden
 diff	fn:diff	diff the tree in boxes	hint:Use -w to ignore whitespace
 show|sh	show	one commit in full	hint:Takes a changeId
-branch|br	fn:branches	list branches, or switch to one	hint:bare lists local changeIds. -r remote, -a both, new <name> creates
+branch|br	fn:branches	list branches, or switch to one	hint:bare lists local changeIds. -a stacks, -r remote, -g both, new <name> creates
 brr	branch -r	remote branches, straight from git	display:br -r	variant
-bra	branch -a	local and remote branches in one list	display:br -a	variant
+bra	fn:stack	the branch stacks, each branch under the one it was cut from	display:br -a	variant
+brg	branch -a	local and remote branches in one list	display:br -g	variant
 changeId|id	id	resolve a changeId to a sha	nogit
 
 

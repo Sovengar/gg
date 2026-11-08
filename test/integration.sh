@@ -482,7 +482,8 @@ assert_eq "pu is gone" "$("$BIN" -p pu)" "git pu"
 assert_eq "rs is gone" "$("$BIN" -p rs)" "git rs"
 assert_eq "fetch falls through to git" "$("$BIN" -p fetch)" "git fetch"
 assert_eq "brr lists remotes" "$("$BIN" -p brr)" "git branch -r"
-assert_eq "bra lists both" "$("$BIN" -p bra)" "git branch -a"
+assert_eq "brg lists both" "$("$BIN" -p brg)" "git branch -a"
+assert_contains "bra reads the stacks" "$("$BIN" -p bra)" "gg bra"
 assert_contains "up is update" "$("$BIN" -p up)" "gg up"
 if "$BIN" -p sync >/dev/null 2>&1; then ok "sync prints without args"; else no "sync prints without args"; fi
 if "$BIN" sync >/dev/null 2>&1; then no "sync requires a branch"; else ok "sync requires a branch"; fi
@@ -873,6 +874,46 @@ git branch forced side >/dev/null 2>&1
 "$BIN" Dbr forced >/dev/null 2>&1
 assert_eq "Dbr forces the delete" "$(git for-each-ref refs/heads/forced --format='%(refname:short)')" ""
 if "$BIN" dbr tb >/dev/null 2>&1; then no "dbr refuses the current branch"; else ok "dbr refuses the current branch"; fi
+
+echo "branch stacks"
+R=$(newrepo)
+cd "$R" || exit 1
+git commit -q --allow-empty -m one
+git branch side
+"$BIN" br side >/dev/null 2>&1
+git commit -q --allow-empty -m two
+git branch api
+"$BIN" br api >/dev/null 2>&1
+git commit -q --allow-empty -m three
+stack=$(NO_COLOR=1 "$BIN" br -a)
+assert_contains "br -a heads the stacks" "$stack" "branch stacks (3)"
+assert_contains "br -a puts the child on its parent" "$stack" "↑1 on side"
+assert_contains "br -a counts a commit above the base" "$stack" "↑1 on tb"
+assert_contains "br -a marks the default branch" "$stack" "default"
+assert_contains "br -a draws a branch mark" "$stack" "└"
+assert_lacks "br -a is not the git list" "$stack" "remotes/origin"
+assert_eq "br -g asks git for both lists" "$("$BIN" -p br -g)" "gg br -g"
+git branch lone tb >/dev/null 2>&1
+assert_contains "br -a keeps a branch on the base" "$(NO_COLOR=1 "$BIN" br -a | grep lone)" "base"
+# two branches cut from one commit contain neither tip: they are siblings, and
+# a parent rule that only looked at the merge base would name each one the
+# parent of the other and print neither
+git branch fork tb
+"$BIN" br fork >/dev/null 2>&1
+git commit -q --allow-empty -m forked
+forked=$(NO_COLOR=1 "$BIN" br -a)
+assert_contains "br -a keeps diverged branches in view" "$forked" "fork"
+assert_contains "br -a parks a diverged branch on its base" "$(printf '%s\n' "$forked" | grep fork)" "↑1 on "
+assert_eq "br -a prints every branch once" "$(printf '%s\n' "$forked" | sed -n '2,$p' | grep -cE 'base|↑')" "5"
+# side and fork are both children of tb, so neither may be indented: an indent
+# would say one sits on the other
+assert_lacks "br -a does not indent parallel branches" "$(printf '%s\n' "$forked" | grep ' fork ')" "└"
+assert_contains "br -a indents a branch on a branch" "$(printf '%s\n' "$forked" | grep ' api ')" "└"
+# the dashboard draws one box per stack, the way but does: branches that only
+# share a base are separate boxes, a parent and its child share one
+assert_eq "the dashboard opens a box per stack" "$(NO_COLOR=1 "$BIN" | grep -c '^┊╭┄')" "3"
+assert_eq "the dashboard closes a box per stack" "$(NO_COLOR=1 "$BIN" | grep -c '^├╯')" "3"
+assert_contains "a stack keeps its parent in the same box" "$(NO_COLOR=1 "$BIN" | sed -n '/api/,/├╯/p')" "[side]"
 
 echo "branch changeIds stay apart on one commit"
 R=$(newrepo)

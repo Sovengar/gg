@@ -29,7 +29,14 @@ func Branches(args []string) int {
 			}
 			return createBranch(args[1:])
 		}
-		// other flags belong to git branch: -a, -v, --merged and friends
+		switch args[0] {
+		case "-a", "--stacks", "--stack":
+			// -a reads the stacks; the plain local-plus-remote list moved to -g
+			return Stack()
+		case "-g", "--global":
+			return gitx.Run(append([]string{"branch", "-a"}, args[1:]...)...)
+		}
+		// other flags belong to git branch: -r, -v, --merged and friends
 		return gitx.Run(append([]string{"branch"}, args...)...)
 	}
 	if args[0] == "new" {
@@ -178,6 +185,20 @@ func holdsName(rows []branchRow, name string) bool {
 // DefaultBranch names the branch a repository is expected to keep: the one
 // origin points HEAD at, else a conventional name, else the current branch.
 func DefaultBranch() string {
+	if name := ConventionBranch(); name != "" {
+		return name
+	}
+	if cur, err := gitx.Output("rev-parse", "--abbrev-ref", "HEAD"); err == nil && cur != "HEAD" {
+		return cur
+	}
+	return ""
+}
+
+// ConventionBranch names the default branch only when the repository says so:
+// origin points HEAD at it, or it carries a conventional name. It returns ""
+// rather than fall back to the current branch, because a caller that treats
+// the default as fixed ground cannot use a name that moves with HEAD.
+func ConventionBranch() string {
 	if out, err := gitx.Output("symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"); err == nil && out != "" {
 		return strings.TrimPrefix(out, "origin/")
 	}
@@ -185,9 +206,6 @@ func DefaultBranch() string {
 		if branchExists(name) {
 			return name
 		}
-	}
-	if cur, err := gitx.Output("rev-parse", "--abbrev-ref", "HEAD"); err == nil && cur != "HEAD" {
-		return cur
 	}
 	return ""
 }

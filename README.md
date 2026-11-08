@@ -29,7 +29,8 @@ gg log 20          more of it, extra args go to git log
 gg log -l 40       long line: relative age and author
 gg branch          branches sorted by recency (alias: br)
 gg br -r           remote branches only
-gg br -a           local and remote branches in one list
+gg br -a           the stacks: each branch under the one it was cut from
+gg br -g           local and remote branches in one list
 gg branch -c side  create a branch and switch to it (alias: cbr; branch new works too)
 gg branch -d side  delete a branch, its tip kept in refs/gg/deleted (alias: dbr)
 gg branch -D side  force the delete, unmerged commits and all (alias: Dbr)

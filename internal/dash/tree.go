@@ -96,29 +96,51 @@ func tree(args []string, opt view) int {
 	fileLane(files.Load())
 	fmt.Println(ui.Dim("┊"))
 
-	for i, l := range lanes {
-		head := "┊├┄"
-		if i == 0 {
-			head = "┊╭┄"
-		}
-		fmt.Println(ui.Dim(head) + " " + ui.Red(branchHandle(l.name)) + " " + ui.Dim("["+l.name+"]"))
-		for _, row := range l.commits {
-			fmt.Println(ui.Dim("┊") + row.Text)
-			if opt.files {
-				for _, frow := range changedFiles(row.Sha, opt.all) {
-					fmt.Println(ui.Dim("┊") + "   " + frow)
+	// lanes are drawn stack by stack, the way but does it: one box per stack,
+	// opened with the branch on top and closed with its own ├╯. Branches that
+	// only share a base are separate stacks, so they get separate boxes rather
+	// than one long column the eye reads as a chain.
+	byName := make(map[string]lane, len(lanes))
+	names := make([]string, 0, len(lanes))
+	for _, l := range lanes {
+		byName[l.name] = l
+		names = append(names, l.name)
+	}
+	groups := ops.StackGroups(names)
+	drawn := 0
+	for _, group := range groups {
+		for i, name := range group {
+			l, ok := byName[name]
+			if !ok {
+				continue
+			}
+			head := "┊├┄"
+			if i == 0 {
+				head = "┊╭┄"
+			}
+			fmt.Println(ui.Dim(head) + " " + ui.Red(branchHandle(l.name)) + " " + ui.Dim("["+l.name+"]"))
+			for _, row := range l.commits {
+				fmt.Println(ui.Dim("┊") + row.Text)
+				if opt.files {
+					for _, frow := range changedFiles(row.Sha, opt.all) {
+						fmt.Println(ui.Dim("┊") + "   " + frow)
+					}
 				}
 			}
+			if opt.newest && len(l.commits) == 0 {
+				fmt.Println(ui.Dim("┊") + "   " + ui.Dim("(at the common base)"))
+			}
+			if i < len(group)-1 {
+				fmt.Println(ui.Dim("┊│"))
+			}
 		}
-		if opt.newest && len(l.commits) == 0 {
-			fmt.Println(ui.Dim("┊") + "   " + ui.Dim("(at the common base)"))
-		}
-		if i < len(lanes)-1 {
-			fmt.Println(ui.Dim("┊│"))
+		fmt.Println(ui.Dim("├╯"))
+		drawn++
+		if drawn < len(groups) {
+			fmt.Println(ui.Dim("┊"))
 		}
 	}
-	if len(lanes) > 0 {
-		fmt.Println(ui.Dim("├╯"))
+	if drawn > 0 {
 		fmt.Println(ui.Dim("┊"))
 	}
 
