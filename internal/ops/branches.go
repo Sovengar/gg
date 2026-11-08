@@ -11,9 +11,9 @@ import (
 )
 
 // Branches lists branches newest first, each with its own branch changeId, or
-// switches to one. It never creates a branch by accident: only "branch new"
-// and "cbr" create, so a mistyped name fails with a direction instead of
-// silently branching off HEAD.
+// switches to one. It never creates a branch by accident: only "branch -c"
+// (or its old "branch new" form) and "cbr" create, so a mistyped name fails
+// with a direction instead of silently branching off HEAD.
 func Branches(args []string) int {
 	if len(args) == 0 {
 		return listBranches()
@@ -21,6 +21,13 @@ func Branches(args []string) int {
 	if strings.HasPrefix(args[0], "-") {
 		if deleteFlag(args[0]) {
 			return DeleteBranch(args)
+		}
+		if createFlag(args[0]) {
+			if len(args) < 2 {
+				ui.Errf("gg branch -c <name>: name the branch to create")
+				return 2
+			}
+			return createBranch(args[1:])
 		}
 		// other flags belong to git branch: -a, -v, --merged and friends
 		return gitx.Run(append([]string{"branch"}, args...)...)
@@ -30,9 +37,7 @@ func Branches(args []string) int {
 			ui.Errf("gg branch new <name>: name the branch to create")
 			return 2
 		}
-		oplog.Record("branch")
-		WipAmend()
-		return gitx.Run(append([]string{"switch", "-c"}, args[1:]...)...)
+		return createBranch(args[1:])
 	}
 
 	target := args[0]
@@ -257,6 +262,23 @@ func DeleteBranch(args []string) int {
 		recentBranches(5)
 	}
 	return rc
+}
+
+// createBranch makes a branch and switches to it, leaving the rest of the
+// arguments to git switch -c.
+func createBranch(args []string) int {
+	oplog.Record("branch")
+	WipAmend()
+	return gitx.Run(append([]string{"switch", "-c"}, args...)...)
+}
+
+// createFlag reports whether the first argument asks for a new branch.
+func createFlag(a string) bool {
+	switch a {
+	case "-c", "--create":
+		return true
+	}
+	return false
 }
 
 // deleteFlag reports whether the first argument asks for a deletion.

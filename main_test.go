@@ -56,6 +56,12 @@ func TestWrapItems(t *testing.T) {
 		}
 	}
 
+	// the middle dot is multi-byte: the limit counts runes, not bytes
+	got = wrapItems([]string{"status", "log", "br -r", "br -a"}, 28)
+	if len(got) != 1 {
+		t.Errorf("multi-byte separator wrapped early: %q", got)
+	}
+
 	// a single item wider than the limit still prints whole
 	got = wrapItems([]string{"reword (rename, describe, desc)", "split"}, 20)
 	if got[0] != "reword (rename, describe, desc)" || got[1] != "split" {
@@ -82,8 +88,9 @@ func TestSplitDisplay(t *testing.T) {
 	}{
 		{"log", "log", nil},
 		{"status (st, sta, stf)", "status", []string{"st", "sta", "stf"}},
-		{"branch new (cbr)", "branch new", []string{"cbr"}},
-		{"dbr (delete-branch)", "dbr", []string{"delete-branch"}},
+		{"branch -c (cbr)", "branch -c", []string{"cbr"}},
+		{"branch -d (dbr)", "branch -d", []string{"dbr"}},
+		{"branch -D", "branch -D", nil},
 	}
 	for _, c := range cases {
 		name, aliases := splitDisplay(c.display)

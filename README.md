@@ -27,6 +27,10 @@ gg log             short graph log, 6 commits by default, ✓ pushed / ↑ local
 gg log 20          more of it, extra args go to git log
 gg log -l 40       long line: relative age and author
 gg branch          branches sorted by recency (alias: br)
+gg br -r           remote branches only
+gg br -a           local and remote branches in one list
+gg branch -c side  create a branch and switch to it (alias: cbr; branch new works too)
+gg branch -d side  delete a branch, its tip kept in refs/gg/deleted (alias: dbr; -D forces)
 gg reflog          reflog
 gg diff            diff in boxes, one per change (plain git diff when piped)
 gg diff -w         diff ignoring whitespace
@@ -50,7 +54,7 @@ gg wt new side     a worktree for a branch, one directory each
 gg wt ls           each worktree, its path and how dirty it is
 gg wt rm side      remove it, --force when dirty
 gg absorb          git absorb
-gg fetch           fetch --all --prune: every remote, dead refs dropped
+gg fetch           plain git fetch: fetch.all and fetch.prune decide the scope
 gg update / gg up  fetch --prune --all + pull --rebase --autostash
 gg push / gg p     push, refuse on drift, offer force-with-lease
 gg sync <branch>   pull --rebase origin <branch>, then push
@@ -62,7 +66,6 @@ gg redo            step forward again after an undo
 gg oplog           the operations undo can reach
 gg oplog clear     drop the log, then git gc --prune=now frees the objects
 gg undo --force    undo even when it removes published commits
-gg raw log -5      anything goes, still recorded
 gg help            compact verb table: canonical names per category, aliases under (alias: h)
 gg help -all       full table: description, hint and the git command per verb
 gg tools           external tools + install state
@@ -71,7 +74,7 @@ gg tools           external tools + install state
 Unknown verbs go straight to git: `gg log --oneline -5` runs `git log --oneline -5`.
 
 Help is grouped by category: Inspection, Rollback work, Register work,
-Edit saved work, Branching, Operations, Remote, Tools. There is no stash: the
+Edit saved work, Branching, Operations, Remote, Tools, Others. There is no stash: the
 working tree, the index and wip commits are one mechanism (`gg new`, `gg wt`).
 `gg help` (or `gg h`) prints one line of canonical names per category, then a
 grey `aka` line with that category's aliases, so the whole table stays on
@@ -288,7 +291,7 @@ interactive rebase on that commit, you amend it, and `gg continue` resumes.
 ## Layout
 
 ```
-main.go                 dispatch, flags, footer, raw
+main.go                 dispatch, flags, footer
 internal/verbs/         registry (verbs.tsv embedded) + resolution
 internal/gitx/          git binary wrapper
 internal/oplog/         worktree snapshots, undo and redo

@@ -28,6 +28,8 @@ type Entry struct {
 	Category    string
 	Tool        string
 	Hidden      bool
+	Variant     bool   // a flag on another verb, listed by gg help -p only
+	DisplayOnly bool   // a help row with no name to type, e.g. branch -D
 	NoGit       bool   // no git equivalent to show in help -all
 	Shown       string // name column override in help, e.g. status (st, sta, stf)
 	Fn          func(args []string) int
@@ -118,13 +120,14 @@ var mutating = map[string]bool{
 	"revert": true, "rv": true,
 	"reword": true, "rename": true, "describe": true, "desc": true,
 	"sw": true, "cbr": true, "dbr": true, "delete-branch": true,
-	"mg": true, "wt": true, "re": true, "raw": true,
+	"mg": true, "wt": true, "re": true,
 }
 
-var table = parse(registry)
+var table, rows = parse(registry)
 
-func parse(src string) map[string]Entry {
+func parse(src string) (map[string]Entry, []Entry) {
 	out := make(map[string]Entry)
+	var list []Entry
 	category := "other"
 	for _, line := range strings.Split(src, "\n") {
 		line = strings.TrimSpace(line)
@@ -164,8 +167,14 @@ func parse(src string) map[string]Entry {
 			if field == "hidden" {
 				entry.Hidden = true
 			}
+			if field == "variant" {
+				entry.Variant = true
+			}
 			if field == "nogit" {
 				entry.NoGit = true
+			}
+			if field == "displayonly" {
+				entry.DisplayOnly = true
 			}
 		}
 		if fn, ok := strings.CutPrefix(snippet, "fn:"); ok {
@@ -179,18 +188,22 @@ func parse(src string) map[string]Entry {
 			}
 			entry.Snippet = strings.Join(fields[1:], " ")
 		}
+		list = append(list, entry)
 		for _, alias := range aliases {
 			if alias = strings.TrimSpace(alias); alias != "" {
 				out[alias] = entry
 			}
 		}
 	}
-	return out
+	return out, list
 }
 
 // Lookup resolves a verb name.
 func Lookup(name string) (Entry, bool) {
 	e, ok := table[name]
+	if ok && e.DisplayOnly {
+		return e, false
+	}
 	if ok && !e.IsFunc() && !e.IsTool() && e.Snippet == "" {
 		return e, false
 	}
@@ -207,13 +220,11 @@ func Lookup(name string) (Entry, bool) {
 // Names returns verb names in registry order.
 func Names() []string {
 	var names []string
-	for _, line := range strings.Split(registry, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
+	for _, e := range rows {
+		if e.DisplayOnly {
 			continue
 		}
-		name, _, _ := strings.Cut(line, "\t")
-		for _, alias := range strings.Split(strings.TrimSpace(name), "|") {
+		for _, alias := range strings.Split(e.Label, "|") {
 			if alias = strings.TrimSpace(alias); alias != "" {
 				names = append(names, alias)
 			}
@@ -226,19 +237,7 @@ func Names() []string {
 func IsMutating(name string) bool { return mutating[name] }
 
 // All returns one entry per registry row, aliases grouped.
-func All() []Entry {
-	var out []Entry
-	seen := make(map[string]bool)
-	for _, alias := range Names() {
-		e, ok := Lookup(alias)
-		if !ok || seen[e.Label] {
-			continue
-		}
-		seen[e.Label] = true
-		out = append(out, e)
-	}
-	return out
-}
+func All() []Entry { return append([]Entry(nil), rows...) }
 
 // Describe is the one-line help text for the verb.
 // Display is the name column in help: the canonical name first, the shorter

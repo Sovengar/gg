@@ -55,7 +55,10 @@ echo "help and registry"
 out=$("$BIN" help)
 assert_contains "help lists status" "$out" "status"
 assert_contains "help lists the aliases" "$out" "aka    st · sta · stf · br"
-assert_contains "help lists raw" "$out" "raw"
+assert_contains "help keeps variants off the canonical line" "$(NO_COLOR=1 "$BIN" help | sed -n 1p)" "branch · id"
+assert_contains "params lists br -r" "$("$BIN" help -p)" "br -r"
+assert_contains "params lists br -a" "$("$BIN" help -p)" "br -a"
+assert_contains "params lists update --check" "$("$BIN" help -p)" "--check fetches, then reports"
 assert_contains "help -all shows git command" "$("$BIN" help -all)" "git show"
 case "$out" in
 *"Overview of the workspace"*) no "default help hides descriptions" ;;
@@ -79,9 +82,17 @@ assert_contains "st shows untracked" "$("$BIN" st)" "A f.txt"
 assert_contains "st draws the tree" "$("$BIN" st)" "[uncommitted]"
 assert_eq "print mode" "$("$BIN" -p st -u)" "gg st -u"
 assert_eq "dry is print" "$("$BIN" --dry st)" "gg st"
-assert_contains "raw passthrough" "$("$BIN" raw rev-parse --short HEAD)" "$(git rev-parse --short HEAD)"
 assert_eq "unknown verb goes to git" "$("$BIN" -p blame -L 1,1 f.txt)" "git blame -L 1,1 f.txt"
 assert_contains "log renders" "$("$BIN" log 1)" "init"
+
+echo "help lists the built-ins"
+out=$("$BIN" help)
+assert_contains "help lists gg" "$out" "gg"
+assert_contains "help lists help" "$out" "help"
+case "$out" in
+*raw*) no "help dropped raw" ;;
+*) ok "help dropped raw" ;;
+esac
 
 echo "commit, footer, undo"
 R=$(newrepo)
@@ -373,7 +384,9 @@ assert_contains "print mode for fn verbs" "$("$BIN" -p push)" "gg push"
 assert_contains "p is push" "$("$BIN" -p p)" "gg p"
 assert_eq "pu is gone" "$("$BIN" -p pu)" "git pu"
 assert_eq "rs is gone" "$("$BIN" -p rs)" "git rs"
-assert_eq "fetch prunes every remote" "$("$BIN" -p fetch)" "git fetch --all --prune"
+assert_eq "fetch falls through to git" "$("$BIN" -p fetch)" "git fetch"
+assert_eq "brr lists remotes" "$("$BIN" -p brr)" "git branch -r"
+assert_eq "bra lists both" "$("$BIN" -p bra)" "git branch -a"
 assert_contains "up is update" "$("$BIN" -p up)" "gg up"
 if "$BIN" -p sync >/dev/null 2>&1; then ok "sync prints without args"; else no "sync prints without args"; fi
 if "$BIN" sync >/dev/null 2>&1; then no "sync requires a branch"; else ok "sync requires a branch"; fi
@@ -608,8 +621,10 @@ assert_eq "br switches to a branch" "$(git rev-parse --abbrev-ref HEAD)" "side"
 assert_eq "br never creates a branch" "$(git for-each-ref refs/heads --format='%(refname:short)' | wc -l | tr -d ' ')" "2"
 if "$BIN" br nope >/dev/null 2>&1; then no "br refuses an unknown branch"; else ok "br refuses an unknown branch"; fi
 assert_contains "br points at cbr" "$("$BIN" br nope 2>&1)" "gg cbr nope"
-"$BIN" branch new fresh >/dev/null 2>&1
-assert_eq "branch new creates and switches" "$(git rev-parse --abbrev-ref HEAD)" "fresh"
+"$BIN" branch -c fresh >/dev/null 2>&1
+assert_eq "branch -c creates and switches" "$(git rev-parse --abbrev-ref HEAD)" "fresh"
+"$BIN" branch new oldform >/dev/null 2>&1
+assert_eq "branch new still creates" "$(git rev-parse --abbrev-ref HEAD)" "oldform"
 "$BIN" br tb >/dev/null 2>&1
 recent=$(NO_COLOR=1 "$BIN" dbr side 2>/dev/null)
 assert_eq "dbr deletes a merged branch" "$(git for-each-ref refs/heads/side --format='%(refname:short)')" ""
@@ -677,12 +692,6 @@ assert_eq "cbr created the branch" "$(git rev-parse --abbrev-ref HEAD)" "created
 assert_eq "undo removes a created branch" "$(git for-each-ref refs/heads/created --format='%(refname)')" ""
 assert_eq "undo returns after removing a created branch" "$(git rev-parse --abbrev-ref HEAD)" "tb"
 
-git tag v1
-tag_sha=$(git rev-parse refs/tags/v1)
-"$BIN" raw tag -d v1 >/dev/null 2>&1
-assert_eq "raw deleted the tag" "$(git for-each-ref refs/tags/v1 --format='%(refname)')" ""
-"$BIN" undo >/dev/null 2>&1
-assert_eq "undo restores a deleted tag" "$(git rev-parse refs/tags/v1)" "$tag_sha"
 
 git branch other
 "$BIN" sw other >/dev/null 2>&1
@@ -695,6 +704,25 @@ assert_eq "br new created the branch" "$(git rev-parse --abbrev-ref HEAD)" "adde
 "$BIN" undo >/dev/null 2>&1
 assert_eq "undo removes a branch made by br new" "$(git for-each-ref refs/heads/added --format='%(refname)')" ""
 assert_eq "undo returns after removing a br new branch" "$(git rev-parse --abbrev-ref HEAD)" "tb"
+
+echo "update --check"
+R=$(newrepo)
+git init -q --bare "$R-upstream.git"
+cd "$R" || exit 1
+git remote add origin "$R-upstream.git"
+git push -q -u origin tb
+out=$("$BIN" up --check)
+assert_contains "check reports behind and ahead" "$out" "0 behind · 0 ahead"
+assert_contains "check calls the rebase clean" "$out" "rebase: clean"
+before=$("$BIN" oplog | wc -l)
+"$BIN" up --check >/dev/null 2>&1
+assert_eq "check records no oplog entry" "$("$BIN" oplog | wc -l)" "$before"
+C=$(mktemp -d)
+git clone -q -b tb "$R-upstream.git" "$C"
+(cd "$C" && git commit -q --allow-empty -m other && git push -q origin tb)
+out=$("$BIN" up --check)
+assert_contains "check counts the upstream commit" "$out" "1 behind"
+assert_eq "check leaves HEAD alone" "$(git log -1 --format=%s)" "init"
 
 echo
 echo "passed $pass, failed $fail"

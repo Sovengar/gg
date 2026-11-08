@@ -16,7 +16,9 @@ log	fn:log	graph log, 6 commits by default	hint:Takes a count, -l for long lines
 dash	fn:dash	dashboard: the tree over the newest branches	hidden
 diff	fn:diff	diff the tree in boxes	hint:Use -w to ignore whitespace
 show	show	one commit in full	hint:Takes a changeId
-branch|br|branches	fn:branches	branches, or switch to one	hint:bare lists changeIds, new <name> creates	display:branch (br)
+branch|br|branches	fn:branches	branches, or switch to one	hint:bare lists local changeIds. -r remote, -a both, new <name> creates	display:branch (br)
+brr	branch -r	remote branches, straight from git	display:br -r	variant
+bra	branch -a	local and remote branches in one list	display:br -a	variant
 id	id	resolve a changeId to a sha	nogit
 
 
@@ -44,8 +46,9 @@ edit	fn:edit	stop a rebase at a commit	hint:Takes a changeId
 
 # --- Branching ---
 sw	switch	change branch	hint:Takes a branch
-cbr	switch -c	branch new and switch	hint:Takes a branch	display:branch new (cbr)
-dbr|delete-branch	fn:deleteBranch	delete a branch, tip kept in a ref	hint:Safe by default, -D forces. Takes a branch or a changeId
+cbr	switch -c	branch new and switch	hint:Takes a branch. branch new <name> works too	display:branch -c (cbr)
+dbr|delete-branch	fn:deleteBranch	delete a branch, tip kept in a ref	hint:Safe: unmerged commits stay. Takes a branch or a changeId	display:branch -d (dbr)
+branch -D	branch -D	delete a branch even when unmerged	hint:Force. Drops unmerged commits, keeps the tip ref	display:branch -D	variant	displayonly
 mg	merge	merge a branch into this one	hint:Takes a branch
 wt	fn:wt	parallel branches, one worktree each	hint:Takes new|ls|rm
 
@@ -59,8 +62,7 @@ oplog	fn:oplog	the operations undo can reach	hint:Takes clear to drop the log
 re	reset	move HEAD	hint:Takes a ref
 
 # --- Remote ---
-update|up	fn:update	fetch and rebase on the upstream
-fetch	fetch --all --prune	fetch every remote, prune dead refs	hint:--all --prune by default
+update|up	fn:update	fetch and rebase on the upstream	hint:--check fetches, then reports without rebasing
 push|p	fn:push	push, refuse on drift
 sync	fn:sync	rebase on a branch, then push	hint:Takes a branch
 
@@ -70,5 +72,7 @@ mzt	tool:git-machete	branch layout maintenance
 sim	tool:git-sim	render an operation before running
 hooks	fn:hooks	install the Change-Id hook
 tools	tools	external tools and their install state	nogit
-raw	raw	run git with any arguments, still undoable	nogit
 
+# --- Others ---
+gg	gg	the dashboard: newest branches, one lane each	nogit
+help|h	help	the compact verb table	hint:-p lists params, --all adds descriptions	nogit
