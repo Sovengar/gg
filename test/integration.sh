@@ -508,8 +508,8 @@ assert_contains "p is push" "$("$BIN" -p p)" "gg p"
 assert_eq "pu is gone" "$("$BIN" -p pu)" "git pu"
 assert_eq "rs is gone" "$("$BIN" -p rs)" "git rs"
 assert_eq "fetch falls through to git" "$("$BIN" -p fetch)" "git fetch"
-assert_eq "brr lists remotes" "$("$BIN" -p brr)" "git branch -r"
-assert_eq "brg lists both" "$("$BIN" -p brg)" "git branch -a"
+assert_eq "brlr lists remotes" "$("$BIN" -p brlr)" "git branch -r"
+assert_eq "brla lists both" "$("$BIN" -p brla)" "git branch -a"
 assert_contains "bra reads the stacks" "$("$BIN" -p bra)" "gg bra"
 assert_contains "up is update" "$("$BIN" -p up)" "gg up"
 if "$BIN" -p sync >/dev/null 2>&1; then ok "sync prints without args"; else no "sync prints without args"; fi
@@ -919,7 +919,6 @@ assert_contains "br -a counts a commit above the base" "$stack" "↑1 on tb"
 assert_contains "br -a marks the default branch" "$stack" "default"
 assert_contains "br -a draws a branch mark" "$stack" "└"
 assert_lacks "br -a is not the git list" "$stack" "remotes/origin"
-assert_eq "br -g asks git for both lists" "$("$BIN" -p br -g)" "gg br -g"
 git branch lone tb >/dev/null 2>&1
 assert_contains "br -a keeps a branch on the base" "$(NO_COLOR=1 "$BIN" br -a | grep lone)" "base"
 # two branches cut from one commit contain neither tip: they are siblings, and
@@ -1079,6 +1078,105 @@ out=$("$BIN" clone 2>&1)
 rc=$?
 assert_eq "clone without a url exits 2" "$rc" "2"
 assert_contains "clone without a url names its usage" "$out" "gg clone <url>"
+
+echo "branch -lm, -la, -lr"
+R=$(newrepo)
+cd "$R" || exit 1
+git branch merged
+git switch -qc unmerged
+git commit -q --allow-empty -m ahead
+git switch -q tb
+out=$("$BIN" br -lm)
+assert_contains "br -lm lists merged branches" "$out" "merged"
+assert_lacks "br -lm hides unmerged branches" "$out" "unmerged"
+assert_contains "br -lm names the target" "$out" "merged into HEAD"
+out=$("$BIN" br -lm merged)
+assert_contains "br -lm takes a target" "$out" "merged into merged"
+"$BIN" br -la >/dev/null 2>&1 || no "br -la runs"
+assert_eq "br -la asks git for both lists" "$("$BIN" -p brla)" "git branch -a"
+assert_eq "br -lr asks git for the remote list" "$("$BIN" -p brlr)" "git branch -r"
+out=$("$BIN" br -g 2>&1)
+assert_contains "br -g points at -la" "$out" "now -la"
+out=$("$BIN" br -r 2>&1)
+assert_contains "br -r points at -lr" "$out" "now -lr"
+
+echo "tag"
+R=$(newrepo)
+cd "$R" || exit 1
+git tag v1.0.0
+git tag v1.2.0
+assert_eq "tag lists newest version first" "$("$BIN" tag | awk '{print $1}' | head -1)" "v1.2.0"
+"$BIN" tag -m msg v2.0.0 >/dev/null 2>&1
+assert_eq "tag creates" "$(git tag -l v2.0.0)" "v2.0.0"
+"$BIN" tag -d v2.0.0 >/dev/null 2>&1
+assert_eq "tag deletes" "$(git tag -l v2.0.0)" ""
+"$BIN" tag -m keep v3.0.0 >/dev/null 2>&1
+"$BIN" tag -d v3.0.0 >/dev/null 2>&1
+"$BIN" undo >/dev/null 2>&1
+assert_eq "undo brings a deleted tag back" "$(git tag -l v3.0.0)" "v3.0.0"
+assert_contains "tag list is read only" "$("$BIN" h -v)" "tags by version"
+
+echo "remote"
+R=$(newrepo)
+cd "$R" || exit 1
+"$BIN" remote add up /tmp/up.git >/dev/null 2>&1
+assert_contains "remote lists the url" "$("$BIN" remote)" "/tmp/up.git"
+"$BIN" remote set-url up /tmp/other.git >/dev/null 2>&1
+assert_contains "remote set-url reaches git" "$("$BIN" remote)" "/tmp/other.git"
+assert_contains "remote keeps -v" "$("$BIN" remote -v)" "(push)"
+assert_eq "remote print mode" "$("$BIN" -p remote)" "gg remote"
+
+echo "land"
+BARE=$(mktemp -d)/land.git
+git init -q --bare -b main "$BARE"
+R=$(mktemp -d)
+git clone -q "$BARE" "$R" 2>/dev/null
+cd "$R" || exit 1
+git config user.email land@x
+git config user.name land
+git commit -q --allow-empty -m init
+git push -q -u origin main
+git switch -qc topic
+git commit -q --allow-empty -m topic
+out=$("$BIN" land topic </dev/null 2>&1)
+rc=$?
+assert_eq "land refuses non-interactively" "$rc" "1"
+assert_contains "land names the escape flag" "$out" "-y"
+assert_eq "the refused land pushed nothing" "$(git --git-dir="$BARE" rev-parse main)" "$(git rev-parse origin/main)"
+out=$("$BIN" land topic -y 2>&1)
+rc=$?
+assert_eq "land fast-forwards the target" "$rc" "0"
+assert_contains "land says what it landed" "$out" "landed topic onto origin/main"
+assert_contains "land warns that undo cannot un-push" "$out" "cannot un-push"
+assert_eq "land pushed the branch tip" "$(git --git-dir="$BARE" rev-parse main)" "$(git rev-parse topic)"
+assert_eq "land moves the local target with it" "$(git rev-parse main)" "$(git rev-parse topic)"
+out=$("$BIN" land topic -y 2>&1)
+assert_contains "land reports a branch already landed" "$out" "already landed"
+git switch -q main
+git commit -q --allow-empty -m diverge
+git push -q origin main
+git switch -q topic
+out=$("$BIN" land topic -y 2>&1)
+rc=$?
+assert_eq "land refuses a branch that is not ahead" "$rc" "1"
+assert_contains "land points at gg pr" "$out" "gg pr"
+assert_contains "hh lists land" "$("$BIN" hh)" "land"
+
+echo "rebase"
+R=$(newrepo)
+cd "$R" || exit 1
+git commit -q --allow-empty -m one
+git branch base
+git switch -qc topic
+git commit -q --allow-empty -m topic
+git switch -q base
+git commit -q --allow-empty -m base2
+git switch -q topic
+out=$("$BIN" rebase base 2>&1)
+assert_eq "rebase replays the branch on the base" "$(git log --format=%s -1)" "topic"
+assert_eq "rebase moved the base under it" "$(git rev-list --count base..HEAD)" "1"
+assert_eq "rebase runs git rebase" "$("$BIN" -p rb base)" "gg rb base"
+assert_contains "hh lists rebase" "$("$BIN" hh)" "rebase rb"
 
 echo
 echo "passed $pass, failed $fail"

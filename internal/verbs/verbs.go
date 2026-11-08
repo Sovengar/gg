@@ -135,13 +135,15 @@ var mutating = map[string]bool{
 	"split": true, "squash": true, "absorb": true, "empty": true,
 	"move": true, "publish": true, "sync": true, "update": true,
 	"abandon": true, "copy": true, "cp": true, "push": true, "p": true, "up": true,
+	"rebase": true, "rb": true,
+	"tag": true, "t": true,
 	"edit": true, "continue": true, "hooks": true, "abort": true,
 	"new": true, "discard": true, "clear": true, "cl": true,
 	"revert": true, "rv": true,
 	"reword": true, "rename": true, "describe": true, "desc": true,
 	"cbr": true, "dbr": true,
 	"mg": true, "wt": true,
-	"pr": true, "rpr": true, "epr": true,
+	"pr": true, "rpr": true, "epr": true, "land": true,
 }
 
 var table, rows = parse(registry)
