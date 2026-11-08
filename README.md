@@ -59,6 +59,7 @@ gg uncommit <id>   same for any commit, its children replayed on its parent
 gg wt new side     a worktree for a branch, one directory each
 gg wt ls           each worktree, its path and how dirty it is
 gg wt rm side      remove it, --force when dirty
+gg conflict/cf     git mergetool: resolve conflicts with the configured tool
 gg absorb          git absorb
 gg pr              open a PR for this branch; a stacked branch bases on its parent
 gg pr -d           the same, as a draft (extra args go to gh verbatim)
@@ -219,6 +220,14 @@ gg story           gitlogue — animated history replay
 gg mzt             git-machete — branch layout maintenance
 gg sim rebase -i HEAD~3   git-sim — render the operation first
 gg absorb          git-absorb — fold changes into the right commit
+gg hunk            Hunk — review a diff in a TUI
+gg tuicr           tuicr — code review TUI
+gg but             GitButler CLI
+gg jj              Jujutsu
+gg lazygit         lazygit — terminal git UI
+gg prdash          prdash — PR dashboard
+gg gitdash         gitdash — workspace dashboard
+gg conflict        git mergetool — resolve conflicts with the configured tool (alias: cf)
 ```
 
 `gg tools` prints each tool verb and whether the binary is on PATH. Adding a tool

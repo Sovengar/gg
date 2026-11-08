@@ -59,6 +59,7 @@ cbr	switch -c	branch new and switch	hint:Takes a branch. branch new <name> works
 dbr	fn:deleteBranch	delete a branch, tip kept in a ref	hint:Safe: unmerged commits stay. Takes a branch or a changeId	display:branch -d dbr	variant
 Dbr	fn:deleteBranchForce	delete a branch even when unmerged	hint:Force. Drops unmerged commits, keeps the tip ref	display:branch -D Dbr	variant
 mg	merge	merge a branch into this one	hint:Takes a branch
+conflict|cf	mergetool	resolve conflicts with the configured tool	hint:Takes a path, or every conflicted one
 wt	fn:wt	parallel branches, one worktree each	hint:Takes new|ls|rm
 
 # --- Operations ---
@@ -83,6 +84,13 @@ epr	fn:prReviewEdit	review a PR with its diff live	hint:Takes a number. Soft res
 story	tool:gitlogue	animated history replay
 mzt	tool:git-machete	branch layout maintenance
 sim	tool:git-sim	render an operation before running
+hunk	tool:hunk	review a diff in Hunk	hint:Takes diff, show, or a revision
+tuicr	tool:tuicr	code review TUI	hint:Takes a revset, -w for the working tree
+but	tool:but	the GitButler CLI	hint:Takes any but subcommand
+jj	tool:jj	Jujutsu	hint:Takes any jj command
+lazygit	tool:lazygit	a terminal git UI	hint:Takes git arguments
+prdash	tool:prdash	PR dashboard over the open PRs
+gitdash	tool:gitdash	workspace dashboard	hint:-print prints the status table instead
 hooks	fn:hooks	install the Change-Id hook
 tools	tools	external tools and their install state	nogit
 

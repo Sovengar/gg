@@ -76,6 +76,35 @@ func TestToolEntries(t *testing.T) {
 	}
 }
 
+func TestReviewToolVerbs(t *testing.T) {
+	tools := map[string]string{
+		"hunk": "hunk", "tuicr": "tuicr", "but": "but", "jj": "jj",
+		"lazygit": "lazygit", "prdash": "prdash", "gitdash": "gitdash",
+	}
+	for name, binary := range tools {
+		e, ok := Lookup(name)
+		if !ok || !e.IsTool() {
+			t.Errorf("%s should be a tool verb, got ok=%v entry=%+v", name, ok, e)
+			continue
+		}
+		if e.Tool != binary {
+			t.Errorf("%s tool = %q, want %q", name, e.Tool, binary)
+		}
+	}
+}
+
+func TestConflictVerb(t *testing.T) {
+	for _, name := range []string{"conflict", "cf"} {
+		e, ok := Lookup(name)
+		if !ok || e.IsFunc() || e.IsTool() {
+			t.Fatalf("%s should be a git verb, got ok=%v entry=%+v", name, ok, e)
+		}
+		if got := e.Argv(nil); len(got) != 1 || got[0] != "mergetool" {
+			t.Errorf("%s argv = %q, want [mergetool]", name, got)
+		}
+	}
+}
+
 func TestPRVerbsRegistered(t *testing.T) {
 	for _, name := range []string{"pr", "rpr", "epr"} {
 		e, ok := Lookup(name)
