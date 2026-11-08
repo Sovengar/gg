@@ -258,19 +258,43 @@ assert_eq "log takes a count" "$("$BIN" log 3 | grep -c '^●')" "3"
 assert_contains "log marks unpushed with a yellow ball" "$(GG_COLOR=always "$BIN" log 1)" "95m●"
 assert_contains "log long shows the author" "$("$BIN" log -l 1)" "["
 out=$("$BIN")
-assert_contains "dashboard has files" "$out" "files"
-assert_contains "dashboard has commits" "$out" "commits"
-assert_contains "dashboard has branches" "$out" "branches"
-assert_contains "dashboard has a changeId" "$out" "commit 8"
+assert_contains "dashboard has the uncommitted lane" "$out" "[uncommitted]"
+assert_contains "dashboard closes on the common base" "$out" "(common base)"
+assert_contains "dashboard prints the hints" "$out" "Hint: commits are listed newest first"
+assert_contains "dash status keeps the tree" "$("$BIN" status)" "[uncommitted]"
+
+echo "the three status views"
+R=$(newrepo)
+cd "$R" || exit 1
+git checkout -q -b main
+git commit -q --allow-empty -m "main work"
+git checkout -q -b work main
+for f in 1 2 3 4 5 6 7; do echo "$f" > "f$f.txt"; done
+git add . >/dev/null 2>&1
+git commit -q -m "seven files"
+for b in b1 b2 b3 b4 b5 b6; do
+	git checkout -q "$b" 2>/dev/null || git checkout -q -b "$b"
+	git commit -q --allow-empty -m "$b work"
+done
+git checkout -q work
+assert_eq "dashboard draws five lanes" "$("$BIN" | grep -c '^┊[╭├]┄')" "5"
+assert_contains "dashboard always draws the default branch" "$("$BIN")" "[main]"
+assert_contains "dashboard starts on the uncommitted lane" "$("$BIN" | head -1)" "[uncommitted]"
+assert_lacks "st keeps only the worktree lanes" "$("$BIN" st)" "[b1]"
+assert_lacks "st lists no files" "$("$BIN" st)" " more"
+assert_contains "stf marks the capped file list" "$("$BIN" stf)" "+2 more"
+assert_eq "stf lists five changed files" "$("$BIN" stf | grep -c '^┊   [AMD] ')" "5"
 
 echo "aliases and abort"
 R=$(newrepo)
 cd "$R" || exit 1
 git commit -q --allow-empty -m second
 help=$("$BIN" help)
-assert_contains "help groups commit (c, ca)" "$help" "commit (c, ca)"
-assert_contains "help groups push (pu)" "$help" "push (pu)"
-assert_contains "help groups update (up)" "$help" "update (up)"
+assert_contains "help groups commit" "$help" "commit"
+assert_contains "help groups push" "$help" "push"
+assert_contains "help lists the commit aliases" "$help" "aka    c · ca · cp"
+assert_contains "help lists the push alias" "$help" "aka    up · p"
+assert_contains "help groups update" "$help" "update"
 changeId=$("$BIN" log 1 | awk '{print $2}')
 "$BIN" edit "$changeId" >/dev/null 2>&1
 assert_eq "edit stops the rebase" "$(git rev-parse --abbrev-ref HEAD)" "HEAD"

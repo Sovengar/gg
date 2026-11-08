@@ -54,9 +54,15 @@ func Run(args []string) int {
 	return page(append(gitArgs, "--color=always"), r)
 }
 
+// Line is one rendered commit row and the sha it names.
+type Line struct {
+	Sha  string
+	Text string
+}
+
 // BranchLines renders one lane of the dashboard: the commits of tip that base
 // does not reach, newest first. Every row is already prefixed with its ball.
-func BranchLines(tip, base string, n int) []string {
+func BranchLines(tip, base string, n int) []Line {
 	if tip == "" {
 		return nil
 	}
@@ -69,13 +75,13 @@ func BranchLines(tip, base string, n int) []string {
 	if err != nil {
 		return nil
 	}
-	lines := make([]string, 0, len(out))
+	lines := make([]Line, 0, len(out))
 	for _, raw := range out {
 		fields := strings.Split(strings.TrimRight(raw, "\r"), "\x1f")
 		if len(fields) < 8 {
 			continue
 		}
-		lines = append(lines, r.ball(fields[0])+" "+r.tail(fields))
+		lines = append(lines, Line{Sha: fields[0], Text: r.ball(fields[0]) + " " + r.tail(fields)})
 	}
 	return lines
 }

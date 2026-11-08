@@ -51,6 +51,7 @@ var functions = map[string]func([]string) int{
 	"amend":        ops.Amend,
 	"dash":         dash.Run,
 	"tree":         dash.Tree,
+	"treeFull":     dash.TreeFull,
 	"diff":         diffview.Run,
 	"branches":     ops.Branches,
 	"deleteBranch": ops.DeleteBranch,

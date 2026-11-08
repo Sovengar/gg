@@ -1,3 +1,5 @@
+// Package dash renders the branch tree: the default gg view and the two
+// status views built on it.
 package dash
 
 import (
@@ -12,20 +14,56 @@ import (
 	"gg/internal/ui"
 )
 
-// maxLanes caps how many branch lanes the tree draws.
-const maxLanes = 4
+const (
+	// maxLanes caps how many branch lanes `gg st` draws.
+	maxLanes = 4
+	// dashLanes caps how many the default view draws: the newest branches.
+	dashLanes = 5
+	// maxFiles caps how many changed paths a commit lists in the full view.
+	maxFiles = 5
+	// defaultCommits is how many commits each lane shows.
+	defaultCommits = 6
+)
 
 // lane is one branch drawn in the tree. Parallel branches are real worktrees:
 // every branch a worktree holds gets its own lane.
 type lane struct {
 	name    string
 	tip     string
-	commits []string
+	commits []hist.Line
 }
 
-// Tree prints the but-style tree: the uncommitted files, one lane per branch,
-// the common base and two hints. An optional argument sets the commits per lane.
-func Tree(args []string) int {
+// parsePositive reads a commit count from the first argument.
+func parsePositive(s string) (int, error) {
+	var n int
+	_, err := fmt.Sscanf(s, "%d", &n)
+	if err != nil || n < 1 {
+		return 0, fmt.Errorf("not a positive number")
+	}
+	return n, nil
+}
+
+// view says which tree to draw: how many lanes, how they are picked and whether
+// every commit lists the paths it changes.
+type view struct {
+	lanes  int
+	newest bool // pick the newest branches, one of them the default
+	files  bool
+}
+
+// Tree prints the but-style tree for `gg st`: the uncommitted files, one lane
+// per worktree branch, the common base and two hints. An optional argument sets
+// the commits per lane.
+func Tree(args []string) int { return tree(args, view{lanes: maxLanes}) }
+
+// TreeFull prints the same tree with the changed paths under every commit.
+func TreeFull(args []string) int { return tree(args, view{lanes: maxLanes, files: true}) }
+
+// Run prints the default gg view: the tree over the newest branch lanes. The
+// branch header is left to starship, which already shows it.
+func Run(args []string) int { return tree(args, view{lanes: dashLanes, newest: true}) }
+
+func tree(args []string, opt view) int {
 	n := defaultCommits
 	if len(args) > 0 {
 		if v, err := parsePositive(args[0]); err == nil {
@@ -39,7 +77,7 @@ func Tree(args []string) int {
 		return 1
 	}
 
-	lanes, base := lanesOf(sha, n)
+	lanes, base := lanesOf(sha, n, opt)
 
 	fileLane(files.Load())
 	fmt.Println(ui.Dim("┊"))
@@ -51,7 +89,15 @@ func Tree(args []string) int {
 		}
 		fmt.Println(ui.Dim(head) + " " + ui.Red(branchHandle(l.name)) + " " + ui.Dim("["+l.name+"]"))
 		for _, row := range l.commits {
-			fmt.Println(ui.Dim("┊") + row)
+			fmt.Println(ui.Dim("┊") + row.Text)
+			if opt.files {
+				for _, frow := range changedFiles(row.Sha) {
+					fmt.Println(ui.Dim("┊") + "   " + frow)
+				}
+			}
+		}
+		if opt.newest && len(l.commits) == 0 {
+			fmt.Println(ui.Dim("┊") + "   " + ui.Dim("(at the common base)"))
 		}
 		if i < len(lanes)-1 {
 			fmt.Println(ui.Dim("┊│"))
@@ -75,7 +121,11 @@ func Tree(args []string) int {
 // carrying the changeId its verb takes.
 func fileLane(fidx *files.Index) {
 	rows := fileRows(fidx)
-	fmt.Println(ui.Dim("╭┄") + " " + ui.Red(uncommittedHandle()) + " " + ui.Dim("[uncommitted]") + emptyNote(len(rows)))
+	head := ui.Dim("╭┄") + " " + ui.Red(uncommittedHandle()) + " " + ui.Dim("[uncommitted]")
+	if gitx.InWip() {
+		head += " " + ui.Yellow("wip")
+	}
+	fmt.Println(head + emptyNote(len(rows)))
 	for _, row := range rows {
 		fmt.Println(ui.Dim("┊") + "   " + row)
 	}
@@ -139,31 +189,49 @@ func statusLetter(s string) string {
 	return ui.Cyan(s)
 }
 
+// changedFiles lists the paths one commit touches, capped at maxFiles, with a
+// closing count of the paths the cap hides.
+func changedFiles(sha string) []string {
+	lines, err := gitx.OutputAll("show", "--name-status", "--no-renames", "--format=", sha)
+	if err != nil {
+		return nil
+	}
+	rows := make([]string, 0, maxFiles)
+	hidden := 0
+	for _, l := range lines {
+		code, path, ok := strings.Cut(l, "\t")
+		code = strings.TrimSpace(code)
+		if !ok || path == "" || code == "" {
+			continue
+		}
+		if len(rows) >= maxFiles {
+			hidden++
+			continue
+		}
+		rows = append(rows, statusLetter(code[:1])+" "+path)
+	}
+	if hidden > 0 {
+		rows = append(rows, ui.Dim(fmt.Sprintf("+%d more", hidden)))
+	}
+	return rows
+}
+
 // lanesOf builds the branch lanes and the commit they share as a base.
-func lanesOf(sha string, n int) ([]lane, string) {
+func lanesOf(sha string, n int, opt view) ([]lane, string) {
 	current, _ := gitx.Output("rev-parse", "--abbrev-ref", "HEAD")
 	if current == "HEAD" {
 		current = ""
 	}
-	base := baseFor(current)
+	base := baseFor()
 
-	names := []string{current}
-	if current == "" {
+	var names []string
+	switch {
+	case current == "":
 		names = []string{"detached"}
-	}
-	if current != "" {
-		trees := map[string]bool{}
-		for _, b := range ops.WorktreeBranches() {
-			trees[b] = true
-		}
-		for _, b := range localBranches() {
-			if len(names) >= maxLanes {
-				break
-			}
-			if b.name != current && trees[b.name] {
-				names = append(names, b.name)
-			}
-		}
+	case opt.newest:
+		names = newestLanes(current, opt.lanes)
+	default:
+		names = worktreeLanes(current, opt.lanes)
 	}
 
 	lanes := make([]lane, 0, len(names))
@@ -180,14 +248,79 @@ func lanesOf(sha string, n int) ([]lane, string) {
 		}
 		lanes = append(lanes, lane{name: name, tip: tip, commits: hist.BranchLines(tip, base, n)})
 	}
-	return lanes, base
+	// a lane with nothing above the base adds no row: but prints only the base.
+	// the default view keeps it, so the default branch always has its lane.
+	kept := lanes[:0]
+	for _, l := range lanes {
+		if len(l.commits) > 0 || opt.newest {
+			kept = append(kept, l)
+		}
+	}
+	return kept, base
 }
 
+// worktreeLanes picks the lanes `gg st` draws: the current branch, then the
+// branches a sibling worktree holds, newest first.
+func worktreeLanes(current string, limit int) []string {
+	names := []string{current}
+	trees := map[string]bool{}
+	for _, b := range ops.WorktreeBranches() {
+		trees[b] = true
+	}
+	for _, b := range localBranches() {
+		if len(names) >= limit {
+			break
+		}
+		if b.name != current && trees[b.name] {
+			names = append(names, b.name)
+		}
+	}
+	return names
+}
+
+// newestLanes picks the lanes the default view draws: the current branch first,
+// then the most recently committed branches, always including the default one.
+func newestLanes(current string, limit int) []string {
+	def := defaultBranch()
+	names := []string{current}
+	for _, b := range localBranches() {
+		if len(names) >= limit {
+			break
+		}
+		if b.name == current {
+			continue
+		}
+		// keep the last slot for the default branch when it is not the current one
+		if len(names) == limit-1 && def != "" && def != current && b.name != def {
+			continue
+		}
+		names = append(names, b.name)
+	}
+	if def != "" && def != current && !hasName(names, def) && len(names) < limit {
+		names = append(names, def)
+	}
+	return names
+}
+
+// hasName reports whether names already holds the branch.
+func hasName(names []string, name string) bool {
+	for _, n := range names {
+		if n == name {
+			return true
+		}
+	}
+	return false
+}
+
+// defaultBranch names the branch every lane branches from.
+func defaultBranch() string { return ops.DefaultBranch() }
+
 // baseFor is the commit every lane branches from: the merge base of the
-// current branch and the target, or the merge base with the upstream.
-func baseFor(current string) string {
-	for _, target := range []string{"gitbutler/target", "main", "master"} {
-		if target == current {
+// current branch with but's target or the default branch, else with the
+// upstream.
+func baseFor() string {
+	for _, target := range []string{"gitbutler/target", defaultBranch()} {
+		if target == "" {
 			continue
 		}
 		if _, err := gitx.Output("rev-parse", "--verify", "--quiet", "refs/heads/"+target); err != nil {
@@ -201,6 +334,11 @@ func baseFor(current string) string {
 		if out, err := gitx.Output("merge-base", "HEAD", up); err == nil {
 			return out
 		}
+	}
+	// no target and no upstream: the first commit is the base, so the tree
+	// still closes on a base line instead of an unbounded lane
+	if roots, err := gitx.OutputAll("rev-list", "--max-parents=0", "HEAD"); err == nil && len(roots) > 0 {
+		return strings.TrimSpace(roots[len(roots)-1])
 	}
 	return ""
 }
@@ -234,7 +372,8 @@ func localBranches() []branch {
 	out := make([]branch, 0, len(lines))
 	for _, l := range lines {
 		name, tip, _ := strings.Cut(l, "\x1f")
-		if name != "" {
+		// gitbutler's own refs are bookkeeping, not branches to draw
+		if name != "" && !strings.HasPrefix(name, "gitbutler/") {
 			out = append(out, branch{name, tip})
 		}
 	}
@@ -249,7 +388,8 @@ func branchHandle(name string) string {
 	return ix.ChangeID(name)
 }
 
-// uncommittedHandle is the stable changeId of the uncommitted lane.
+// uncommittedHandle is the fixed changeId of the uncommitted lane, the same
+// "zz" every but workspace prints.
 func uncommittedHandle() string {
-	return ids.RawChangeID("branch:uncommitted")[:ids.MinLen]
+	return "zz"
 }

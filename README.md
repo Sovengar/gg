@@ -205,28 +205,46 @@ green, yellow and dim. A merge line also lists both sides it joined, as
 
 ### Dashboard
 
-Bare `gg` prints the working state and stops there:
+Bare `gg` prints the tree over the five newest branches, the default branch
+among them. `gg status` narrows the lanes to real worktrees: the current branch
+first, then every branch a sibling worktree holds. `gg stf` adds, under every
+commit, up to five changed paths and a `+N more` tail. No header line: starship
+already shows the branch, the drift and the wip state.
+
+The shape follows `but status`: one lane for the uncommitted files, one lane
+per branch, the common base and two hints.
 
 ```
-trunk  n6 66533a6  ↑2 ↓0
+╭┄ zz [uncommitted]
+┊   kd M docs/README.md
+┊   qz D docs/old.md
+┊   ar A src/feature.sh
+┊   px A notes.md
+┊
+┊╭┄ n6 [trunk]
+┊● n6 66533a6 2m feat: session helper (HEAD -> trunk) [Sovengar] (N)
+┊● mp 8f1c2a1 1h chore: dev env [Sovengar] (G)
+┊│
+┊├┄ k3 [experiment]
+┊● k3 41d0c11 3h feat: try the split [Sovengar] (N)
+├╯
+┊
+┴ 0a1b2c3 (common base) 2026-11-01 Initial commit
 
-files
-  kd  M docs/README.md
-  qz  D docs/old.md
-  ar  A src/feature.sh
-  px  ?? notes.md
-
-commits
-  @hpi 56b174f  chore: dev env (local only)   (HEAD -> trunk)
-  @mpa 8f1c2a1  feat: session helper (local only)
-
-branches
-  * @hpi trunk         ↑2 ↓0
-    @k3d experiment    no upstream
-    @9fa feature/login ↑0 ↓1
+Hint: commits are listed newest first. The first token on each line is the changeId to use in commands.
+Hint: run `gg diff` to see uncommitted changes and `gg c -m "message"` to commit them
 ```
 
-`gg dash 10` overrides how many commits are listed.
+Untracked paths read `A`, like a branch that adds the file. A lane with nothing
+above the base prints `(at the common base)`, so the default branch always keeps
+its row in the dashboard. The base is the merge base with `gitbutler/target`,
+the default branch or the upstream. `gg st 10` overrides how many commits each
+lane lists; gitbutler's own refs never become lanes.
+
+`gg diff` draws the same boxes `but diff` draws: a border sized to the title,
+the file changeId and path, then a gutter of old and new line numbers with red
+removals and green additions. When stdout is not a terminal it runs plain
+`git diff`, so pipes still parse.
 
 ### Built on git history
 

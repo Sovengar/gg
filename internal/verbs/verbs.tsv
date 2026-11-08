@@ -10,10 +10,10 @@
 # --- Inspection ---
 status|st	fn:tree	Overview of the workspace: files, branches, commits	display:status (st, sta, stf)
 sta	fn:tree	-	hidden
-stf	fn:tree	-	hidden
+stf	fn:treeFull	-	hidden
 
 log	fn:log	graph log, 6 commits by default	hint:Takes a count, -l for long lines
-dash	fn:dash	dashboard: header, then the tree	hidden
+dash	fn:dash	dashboard: the tree over the newest branches	hidden
 diff	fn:diff	diff the tree in boxes	hint:Use -w to ignore whitespace
 show	show	one commit in full	hint:Takes a changeId
 branch|br|branches	fn:branches	branches, or switch to one	hint:bare lists changeIds, new <name> creates	display:branch (br)

@@ -118,7 +118,7 @@ func recentBranches(limit int) {
 		return
 	}
 
-	def := defaultBranch()
+	def := DefaultBranch()
 	shown := rows
 	if len(rows) > limit {
 		shown = rows[:limit]
@@ -167,9 +167,9 @@ func holdsName(rows []branchRow, name string) bool {
 	return false
 }
 
-// defaultBranch names the branch a repository is expected to keep: the one
+// DefaultBranch names the branch a repository is expected to keep: the one
 // origin points HEAD at, else a conventional name, else the current branch.
-func defaultBranch() string {
+func DefaultBranch() string {
 	if out, err := gitx.Output("symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"); err == nil && out != "" {
 		return strings.TrimPrefix(out, "origin/")
 	}
