@@ -84,11 +84,11 @@ Edit saved work, Branching, Operations, Remote, Forge, Tools, Others. There is n
 working tree, the index and wip commits are one mechanism (`gg new`, `gg wt`).
 `gg help` (or `gg h`) prints one line of names per category, then a grey `aka`
 line with that category's aliases, so the whole table stays on screen. Both
-lines wrap at `COLUMNS`, 80 by default. A shorthand sits next to its verb in
-parentheses, e.g. `reword (desc)`; a real alias goes on the `aka` line, e.g.
-`aka rename · describe`.
+lines wrap at `COLUMNS`, 80 by default. A shorthand sits grey next to its verb,
+no parentheses: `reword desc`, `commit c, ca`. A real alias goes on the `aka`
+line, e.g. `aka rename · describe`.
 `gg help -p` lists the parameter hints and the flag variants, each variant named
-with the command it stands for: `status -a (sta)`, `status -f (stf)`.
+with the command it stands for: `status -a sta`, `status -f stf`.
 `gg help --all` prints the full table: description, grey parameter hint and the
 git command behind each verb.
 

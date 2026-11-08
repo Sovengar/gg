@@ -50,8 +50,8 @@ func TestParseFlags(t *testing.T) {
 }
 
 func TestWrapItems(t *testing.T) {
-	got := wrapItems([]string{"status (st)", "log", "diff"}, 20)
-	want := []string{"status (st) · log", "diff"}
+	got := wrapItems([]string{"status st", "log", "diff"}, 20)
+	want := []string{"status st · log", "diff"}
 	if len(got) != len(want) {
 		t.Fatalf("lines = %q, want %q", got, want)
 	}
@@ -91,9 +91,9 @@ func TestHelpLines(t *testing.T) {
 		display string
 		aliases []string
 	}{
-		{"status", "status (st)", nil},
-		{"branch", "branch (br)", nil},
-		{"reword", "reword (desc)", []string{"rename", "describe"}},
+		{"status", "status st", nil},
+		{"branch", "branch br", nil},
+		{"reword", "reword desc", []string{"rename", "describe"}},
 	}
 	for _, c := range cases {
 		e, ok := verbs.Lookup(c.verb)

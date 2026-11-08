@@ -279,8 +279,8 @@ func All() []Entry { return append([]Entry(nil), rows...) }
 
 // Describe is the one-line help text for the verb.
 // Display is the name column in help: the canonical name, then its
-// abbreviations in parentheses, or the explicit display: override when set.
-// Aliases are left to the aka line of the compact help.
+// abbreviations, or the explicit display: override when set. No parentheses:
+// every character counts at 80 columns. Aliases stay on the aka line.
 func (e Entry) Display() string {
 	if e.Shown != "" {
 		return e.Shown
@@ -288,14 +288,14 @@ func (e Entry) Display() string {
 	if len(e.Abbrevs) == 0 {
 		return e.Name
 	}
-	return e.Name + " (" + strings.Join(e.Abbrevs, ", ") + ")"
+	return e.Name + " " + strings.Join(e.Abbrevs, ", ")
 }
 
-// DisplayParts cuts Display() into the plain name and the shorthand note,
-// parentheses included, empty when the name carries no abbreviation.
+// DisplayParts cuts Display() into the plain name and the rest of the column,
+// the shorthands and the flags, which help paints grey.
 func (e Entry) DisplayParts() (name, note string) {
 	display := e.Display()
-	if i := strings.LastIndex(display, " ("); i >= 0 && strings.HasSuffix(display, ")") {
+	if i := strings.Index(display, " "); i >= 0 {
 		return display[:i], display[i:]
 	}
 	return display, ""

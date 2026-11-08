@@ -12,13 +12,13 @@
 
 # --- Inspection ---
 status|st	fn:tree	Overview of the workspace: files, branches, commits	hint:Takes a count
-sta	fn:treeAll	every changed path under every commit	hint:st -a shows all, st -f stops at five	display:status -a (sta)	variant
-stf	fn:treeFull	up to five changed paths under every commit	hint:st -a lifts the cap	display:status -f (stf)	variant
+sta	fn:treeAll	every changed path under every commit	hint:st -a shows all, st -f stops at five	display:status -a sta	variant
+stf	fn:treeFull	up to five changed paths under every commit	hint:st -a lifts the cap	display:status -f stf	variant
 
-log	fn:log	graph log, 6 commits by default	hint:Takes a count, -l for long lines
+log|l	fn:log	graph log, 6 commits by default	hint:Takes a count, -l for long lines
 dash	fn:dash	dashboard: the tree over the newest branches	hidden
 diff	fn:diff	diff the tree in boxes	hint:Use -w to ignore whitespace
-show	show	one commit in full	hint:Takes a changeId
+show|sh	show	one commit in full	hint:Takes a changeId
 branch|br	fn:branches	list branches, or switch to one	hint:bare lists local changeIds. -r remote, -a both, new <name> creates
 brr	branch -r	remote branches, straight from git	display:br -r	variant
 bra	branch -a	local and remote branches in one list	display:br -a	variant
@@ -26,10 +26,10 @@ changeId|id	id	resolve a changeId to a sha	nogit
 
 
 # --- Rollback work ---
-discard	fn:discard	drop edits, keep new files	hint:Bare drops all. Takes a changeId or a path
+discard|d	fn:discard	drop edits, keep new files	hint:Bare drops all. Takes a changeId or a path
 clear|cl	fn:clear	drop edits and new files, back to HEAD	hint:Asks before deleting new files, -f skips
-uncommit	fn:uncommit	move commits back into the tree	hint:Takes changeIds, HEAD by default
-abandon	fn:abandon	drop one commit, replay its descendants	hint:Takes a changeId
+uncommit|uc	fn:uncommit	move commits back into the tree	hint:Takes changeIds, HEAD by default
+abandon|ab	fn:abandon	drop one commit, replay its descendants	hint:Takes a changeId
 revert|rv	fn:revert	undo one commit with a new commit	hint:Takes a changeId, -m N for a merge
 
 # --- Register work ---
@@ -44,14 +44,14 @@ amend	fn:amend	fold changes into HEAD, or into a commit	hint:Takes a changeId
 reword|desc|=rename|describe	fn:reword	edit the message of a commit	hint:Takes a changeId
 split	fn:split	cut one commit in two	hint:Takes a changeId, then -- paths
 squash	fn:squash	fold a commit into its parent	hint:Takes a changeId
-move	fn:move	replay a commit onto another base	hint:Takes a changeId
-edit	fn:edit	stop a rebase at a commit	hint:Takes a changeId
+move|mv	fn:move	replay a commit onto another base	hint:Takes a changeId
+edit|e	fn:edit	stop a rebase at a commit	hint:Takes a changeId
 
 # --- Branching ---
-branch switch	fn:branches	change branch	hint:Takes a branch	display:branch (br)	displayonly
-cbr	switch -c	branch new and switch	hint:Takes a branch. branch new <name> works too	display:branch -c (cbr)	variant
-dbr	fn:deleteBranch	delete a branch, tip kept in a ref	hint:Safe: unmerged commits stay. Takes a branch or a changeId	display:branch -d (dbr)	variant
-Dbr	fn:deleteBranchForce	delete a branch even when unmerged	hint:Force. Drops unmerged commits, keeps the tip ref	display:branch -D (Dbr)	variant
+branch switch	fn:branches	change branch	hint:Takes a branch	display:branch	displayonly
+cbr	switch -c	branch new and switch	hint:Takes a branch. branch new <name> works too	display:branch -c cbr	variant
+dbr	fn:deleteBranch	delete a branch, tip kept in a ref	hint:Safe: unmerged commits stay. Takes a branch or a changeId	display:branch -d dbr	variant
+Dbr	fn:deleteBranchForce	delete a branch even when unmerged	hint:Force. Drops unmerged commits, keeps the tip ref	display:branch -D Dbr	variant
 mg	merge	merge a branch into this one	hint:Takes a branch
 wt	fn:wt	parallel branches, one worktree each	hint:Takes new|ls|rm
 
@@ -66,7 +66,7 @@ oplog	fn:oplog	the operations undo can reach	hint:Takes clear to drop the log
 # --- Remote ---
 update|up	fn:update	fetch and rebase on the upstream	hint:--check fetches, then reports without rebasing
 push|p	fn:push	push, refuse on drift
-sync	fn:sync	rebase on a branch, then push	hint:Takes a branch
+sync|s	fn:sync	rebase on a branch, then push	hint:Takes a branch
 
 # --- Forge ---
 pr	fn:prNew	create a PR for this branch	hint:-d drafts. A stacked branch bases on its parent
