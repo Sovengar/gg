@@ -30,13 +30,18 @@ gg log             short graph log, 6 commits by default, ✓ pushed / ↑ local
 gg log 20          more of it, extra args go to git log
 gg log -l 40       long line: relative age and author
 gg branch          branches sorted by recency (alias: br)
-gg br -r           remote branches only
+gg br -lr          remote branches only
 gg br -a           the stacks: each branch under the one it was cut from
-gg br -g           local and remote branches in one list
+gg br -la          local and remote branches in one list
+gg br -lm          branches already merged into HEAD (br -lm main: into main)
 gg branch -c side  create a branch and switch to it (alias: cbr; branch new works too)
 gg branch -d side  delete a branch, its tip kept in refs/gg/deleted (alias: dbr)
 gg branch -D side  force the delete, unmerged commits and all (alias: Dbr)
 gg reflog          reflog
+gg tag             tags newest version first, with the message (alias: t)
+gg tag -m v1.2.0   create one; -d deletes, -s signs
+gg remote          configured remotes, names and urls
+gg remote add up ..  add, rename, rm and set-url reach git
 gg diff            diff in boxes, one per change (plain git diff when piped)
 gg diff -w         diff ignoring whitespace
 gg copy kd main    copy that commit onto main, back on your branch after (alias: cp)
@@ -56,6 +61,7 @@ gg abandon <id>    drop that commit (git history drop)
 gg revert <id>     undo that commit with a new commit, safe once published (alias: rv)
 gg uncommit        move HEAD back into the working copy, change and all
 gg uncommit <id>   same for any commit, its children replayed on its parent
+gg rebase <base>   replay the branch onto another base (alias: rb); -i keeps working
 gg wt new side     a worktree for a branch, one directory each
 gg wt ls           each worktree, its path and how dirty it is
 gg wt rm side      remove it, --force when dirty
@@ -65,6 +71,8 @@ gg pr              open a PR for this branch; a stacked branch bases on its pare
 gg pr -d           the same, as a draft (extra args go to gh verbatim)
 gg pr review 42    mount that PR in its own worktree, commits intact (alias: rpr)
 gg pr review 42 edit  the same, with the PR diff live in the tree (alias: epr)
+gg land <branch>   fast-forward the target onto it and push: no PR, no CI
+gg land -b rel     land on that target instead; -y skips the confirmation
 gg fetch           plain git fetch: fetch.all and fetch.prune decide the scope
 gg update / gg up  fetch --prune --all + pull --rebase --autostash
 gg push / gg p     push; force a rewrite of your own commits only
@@ -90,11 +98,11 @@ Unknown verbs go straight to git: `gg log --oneline -5` runs `git log --oneline 
 Help is grouped by category: Inspection, Rollback work, Register work,
 Edit saved work, Branching, Operations, Remote, Others. There is no stash: the
 working tree, the index and wip commits are one mechanism (`gg new`, `gg wt`).
-`gg help` (or `gg h`) prints one line of names per category, then a grey line
-with that category's aliases, verb first: `describe -> reword, rename`. Both
-lines wrap at `COLUMNS`, 80 by default. A shorthand sits grey next to its verb,
-no parentheses: `describe desc`, `commit c`. A real alias goes on the arrow
-line.
+`gg help` (or `gg h`) prints one line of names per category, then a grey
+footer with the aliases, verb first: `describe -> reword, rename`, and the
+hint to the longer views. Every line wraps at `COLUMNS`, 80 by default. A
+shorthand sits grey next to its verb, no parentheses: `describe desc`,
+`commit c`. A real alias goes on the footer arrow line.
 `gg hh` merges each flag variant into the cell of the verb it flags, name and
 flag together: `status st, -a sta, -f stf`, `branch br, -r, -a, -g, -c
 cbr, -d dbr, -D Dbr`. A variant lives on one row, its parameters in `hh -v`,
@@ -194,7 +202,7 @@ gg diff @na        resolves, then diffs
 
 When the commit is the tip of a local branch the branch name is used, so
 `gg br @nan` switches to the branch rather than to a detached HEAD. Branch
-verbs (`gg br`, `gg cbr`, `gg dbr`, `gg mg`) read a branch changeId
+verbs (`gg br`, `gg cbr`, `gg dbr`, `gg mg`, `gg rb`) read a branch changeId
 first, so `gg br 4d` names the branch even when another branch holds the same
 commit.
 

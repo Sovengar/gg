@@ -22,10 +22,11 @@ log|l	fn:log	graph log, 6 commits by default	hint:Takes a count, -l for long lin
 dash	fn:dash	dashboard: the tree over the newest branches	hidden
 diff	fn:diff	diff the tree in boxes	hint:Use -w to ignore whitespace
 show|sh	show	one commit in full	hint:Takes a changeId
-branch|br	fn:branches	list branches, or switch to one	hint:bare lists local changeIds. -a stacks, -r remote, -g both, new <name> creates
-brr	branch -r	remote branches, straight from git	display:br -r	variant
+branch|br	fn:branches	list branches, or switch to one	hint:bare lists local changeIds. -a stacks, -lr remote, -la both, -lm merged, new <name> creates
+brlr	branch -r	remote branches, straight from git	display:br -lr	variant
 bra	fn:stack	the branch stacks, each branch under the one it was cut from	display:br -a	variant
-brg	branch -a	local and remote branches in one list	display:br -g	variant
+brla	branch -a	local and remote branches in one list	display:br -la	variant
+brlm	fn:mergedBranches	branches already merged into HEAD	hint:Takes a target branch, HEAD by default	display:br -lm	variant
 story	tool:gitlogue	animated history replay
 
 # --- Rollback work ---
@@ -50,6 +51,7 @@ split	fn:split	cut one commit in two	hint:Takes a changeId, then -- paths
 squash	fn:squash	fold a commit into its parent	hint:Takes a changeId
 move|mv	fn:move	replay a commit onto another base	hint:Takes a changeId
 edit|e	fn:edit	stop a rebase at a commit	hint:Takes a changeId
+rebase|rb	fn:rebase	replay commits onto another base	hint:Takes a branch, -i for interactive
 
 # --- Branching ---
 branch switch	fn:branches	change branch	hint:Takes a branch	display:branch <name>	variant
@@ -62,6 +64,7 @@ mzt	tool:git-machete	branch layout maintenance
 
 # --- Operations ---
 reflog	reflog	where HEAD has been
+tag|t	fn:tag	tags by version, or create, delete and sign one	hint:Bare lists. Add -m <msg>, -d, -s
 undo	fn:undo	step back to the previous state	hint:Takes a count and --force
 continue	fn:continue	resume a stopped rebase
 abort	fn:abort	abort whichever operation is stuck	hint:--keep preserves the live worktree changes

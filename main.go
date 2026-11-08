@@ -228,6 +228,8 @@ var branchVerbs = map[string]bool{
 	"branch": true, "br": true, "branches": true,
 	"cbr": true,
 	"dbr": true, "Dbr": true, "mg": true, "merge": true,
+	"rebase": true, "rb": true,
+	"land": true,
 }
 
 func branchVerb(name string) bool { return branchVerbs[name] }
@@ -268,7 +270,7 @@ var wipFold = map[string]bool{
 	"amend": true, "absorb": true, "edit": true, "continue": true,
 	"reword": true, "rename": true, "describe": true, "desc": true,
 	"squash": true, "split": true, "move": true, "abandon": true, "copy": true, "cp": true,
-	"uncommit": true,
+	"uncommit": true, "rebase": true, "rb": true,
 }
 
 // noSnapshot lists the verbs that must see the tree exactly as the user left
@@ -344,6 +346,8 @@ func execFunc(entry verbs.Entry, typed string, rest []string, m mode) int {
 func reportsOnly(verb string, rest []string) bool {
 	switch verb {
 	case "update", "up", "push", "p":
+	case "tag", "t":
+		return ops.IsTagList(rest)
 	default:
 		return false
 	}
@@ -516,15 +520,15 @@ func helpParams() int {
 	return 0
 }
 
-// helpTable prints one line of names per category, then one line naming the
-// aliases of that category, verb first: "describe -> reword, rename". Both
-// lines stay wrapped at COLUMNS so the whole table fits on screen. With merged
-// set, each verb carries the flag variants that belong to it: "status st, -a
-// sta, -f stf". gg h is this view, gg hh is the merged one.
+// helpTable prints one line of names per category, then a footer that names
+// the aliases verb first, "describe -> reword, rename", and the hint to the
+// longer views. Lines stay wrapped at COLUMNS so the whole table fits on
+// screen. With merged set, each verb carries the flag variants that belong to
+// it: "status st, -a sta, -f stf". gg h is this view, gg hh is the merged one.
 func helpTable(merged bool) int {
 	var order []string
 	names := make(map[string][]cell)
-	aliases := make(map[string][]cell)
+	var aliases []cell
 	extras := map[string][]string{}
 	if merged {
 		extras = variantExtras()
@@ -538,7 +542,7 @@ func helpTable(merged bool) int {
 		}
 		names[e.Category] = append(names[e.Category], nameCell(e, extras[e.Name]))
 		if len(e.Aliases) > 0 {
-			aliases[e.Category] = append(aliases[e.Category], aliasCell(e))
+			aliases = append(aliases, aliasCell(e))
 		}
 	}
 
@@ -558,15 +562,14 @@ func helpTable(merged bool) int {
 		for _, line := range lines[1:] {
 			fmt.Printf("%s%s\n", indent, joinCells(line))
 		}
-		if len(aliases[category]) == 0 {
-			continue
-		}
-		for _, line := range wrapCells(aliases[category], width) {
-			fmt.Printf("%s%s\n", indent, joinCells(line))
-		}
 	}
 
 	fmt.Println()
+	if len(aliases) > 0 {
+		for _, line := range wrapCells(aliases, termWidth()-gutter) {
+			fmt.Printf("  %s\n", joinCells(line))
+		}
+	}
 	if merged {
 		fmt.Println(ui.Dim("  gg hh -v  adds the parameters and their hints"))
 	} else {

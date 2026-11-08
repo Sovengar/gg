@@ -58,6 +58,44 @@ func TestMutating(t *testing.T) {
 	if IsMutating("st") {
 		t.Error("st must not be mutating")
 	}
+	for _, name := range []string{"rebase", "rb", "tag", "t"} {
+		if !IsMutating(name) {
+			t.Errorf("%s must be mutating", name)
+		}
+	}
+	// remotes live in git config, not in a ref: no oplog entry can undo them
+	if IsMutating("remote") {
+		t.Error("remote must not be mutating")
+	}
+}
+
+func TestBranchFlagVariants(t *testing.T) {
+	git := map[string]string{
+		"brlr": "git branch -r",
+		"brla": "git branch -a",
+	}
+	for name, want := range git {
+		e, ok := Lookup(name)
+		if !ok {
+			t.Fatalf("%s not found", name)
+		}
+		if got := e.Command(); got != want {
+			t.Errorf("%s command = %q, want %q", name, got, want)
+		}
+	}
+	e, ok := Lookup("brlm")
+	if !ok || !e.IsFunc() {
+		t.Fatalf("brlm should be a Go function, got ok=%v entry=%+v", ok, e)
+	}
+	if got := e.Display(); got != "br -lm" {
+		t.Errorf("brlm display = %q, want br -lm", got)
+	}
+	// -g and -r are gone as flag rows: their work moved to -la and -lr
+	for _, gone := range []string{"brg", "brr"} {
+		if _, ok := Lookup(gone); ok {
+			t.Errorf("%s should no longer resolve", gone)
+		}
+	}
 }
 
 func TestToolEntries(t *testing.T) {

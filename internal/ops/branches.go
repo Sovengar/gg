@@ -31,10 +31,20 @@ func Branches(args []string) int {
 		}
 		switch args[0] {
 		case "-a", "--stacks", "--stack":
-			// -a reads the stacks; the plain local-plus-remote list moved to -g
+			// -a reads the stacks; the plain local-plus-remote list lives in -la
 			return Stack()
-		case "-g", "--global":
+		case "-la", "--all":
 			return gitx.Run(append([]string{"branch", "-a"}, args[1:]...)...)
+		case "-lm", "--merged":
+			return MergedBranches(args[1:])
+		case "-lr", "--remotes":
+			return gitx.Run(append([]string{"branch", "-r"}, args[1:]...)...)
+		case "-g", "--global":
+			ui.Errf("gg br -g is now -la: local and remote branches in one list")
+			return 2
+		case "-r":
+			ui.Errf("gg br -r is now -lr: remote branches")
+			return 2
 		}
 		// other flags belong to git branch: -r, -v, --merged and friends
 		return gitx.Run(append([]string{"branch"}, args...)...)
@@ -153,6 +163,42 @@ func recentBranches(limit int) {
 	for _, r := range shown {
 		fmt.Println(branchLine(r, nameWidth, bidx, def))
 	}
+}
+
+// MergedBranches lists the branches already merged into target (HEAD by
+// default), with the same changeIds and upstream drift the plain list shows.
+func MergedBranches(args []string) int {
+	target := "HEAD"
+	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
+		target = args[0]
+	}
+	out, err := gitx.OutputAll("branch", "--merged", target, "--format=%(refname:short)")
+	if err != nil {
+		ui.Errf("gg br -lm: %s is not a commit", target)
+		return 1
+	}
+	merged := make(map[string]bool, len(out))
+	for _, name := range out {
+		merged[strings.TrimSpace(name)] = true
+	}
+	rows := branchRows()
+	shown := make([]branchRow, 0, len(rows))
+	for _, r := range rows {
+		if merged[r.name] {
+			shown = append(shown, r)
+		}
+	}
+	if len(shown) == 0 {
+		ui.Errf("gg br -lm: no branch is merged into %s", target)
+		return 0
+	}
+	bidx := branchIndexOrEmpty()
+	nameWidth := widestName(shown)
+	fmt.Println(ui.Dim("  merged into " + target + ":"))
+	for _, r := range shown {
+		fmt.Println(branchLine(r, nameWidth, bidx, ""))
+	}
+	return 0
 }
 
 func branchIndexOrEmpty() *ids.BranchIndex {
