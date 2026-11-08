@@ -63,7 +63,9 @@ func Sync(args []string) int {
 	return Push(nil)
 }
 
-// Push pushes, but stops when the upstream moved and asks before forcing.
+// Push pushes. When the upstream holds commits HEAD does not, gg forces on its
+// own only when the force would drop nothing but the user's own commits and no
+// other remote branch holds them. Anything else asks, the way it always has.
 func Push(args []string) int {
 	if wipGuard() {
 		return 1
@@ -81,6 +83,15 @@ func Push(args []string) int {
 	ahead, _ := gitx.Count(up + "..HEAD")
 
 	if behind > 0 {
+		if why, safe := safeForce(up); safe {
+			ui.Errf("gg: %s holds %d commit(s) HEAD rewrote; retrying with lease.", up, behind)
+			if rc := forcePush(args); rc == 0 {
+				return 0
+			}
+			// the lease or --force-if-includes refused: the rewrite is not a pure one
+		} else if why != "" {
+			ui.Errf("gg: not forcing: %s", why)
+		}
 		ui.Errf("gg: %s has %d commit(s) you don't have (you are %d ahead):", up, behind, ahead)
 		printRange("HEAD.." + up)
 		return ask(up, args)
@@ -99,6 +110,45 @@ func Push(args []string) int {
 		return ask(up, args)
 	}
 	return rc
+}
+
+// safeForce reports whether a force push would drop only the user's own commits,
+// on no other remote branch. The lease already covers races; this covers
+// ownership, which no force flag can see.
+func safeForce(up string) (why string, safe bool) {
+	lines, err := gitx.OutputAll("log", "--format=%H %ae", "HEAD.."+up)
+	if err != nil || len(lines) == 0 {
+		return "", false
+	}
+	me, _ := gitx.Output("config", "user.email")
+	upRef := "refs/remotes/" + up
+	for _, line := range lines {
+		sha, mail, _ := strings.Cut(line, " ")
+		if me == "" || mail != me {
+			return "it would drop " + abbrev(sha) + " by " + mail, false
+		}
+		refs, _ := gitx.Output("for-each-ref", "--format=%(refname)", "--contains", sha, "refs/remotes")
+		for _, ref := range strings.Split(refs, "\n") {
+			if ref == "" || ref == upRef || strings.HasSuffix(ref, "/HEAD") {
+				continue
+			}
+			return ref + " also holds " + abbrev(sha), false
+		}
+	}
+	return "", true
+}
+
+// forcePush rewrites the upstream, but only while the lease still holds.
+func forcePush(args []string) int {
+	return gitx.Run(append([]string{"push", "--force-with-lease", "--force-if-includes"}, args...)...)
+}
+
+// abbrev shortens a sha for a one-line message.
+func abbrev(sha string) string {
+	if len(sha) > 7 {
+		return sha[:7]
+	}
+	return sha
 }
 
 // wipGuard refuses to publish the wip commit.
@@ -134,7 +184,7 @@ func ask(up string, args []string) int {
 		}
 		return gitx.Run(append([]string{"push"}, args...)...)
 	case "f", "force":
-		return gitx.Run(append([]string{"push", "--force-with-lease", "--force-if-includes"}, args...)...)
+		return forcePush(args)
 	default:
 		ui.Errf("gg: aborted, nothing pushed")
 		return 1

@@ -62,7 +62,7 @@ gg pr review 42    mount that PR in its own worktree, commits intact (alias: rpr
 gg pr review 42 edit  the same, with the PR diff live in the tree (alias: epr)
 gg fetch           plain git fetch: fetch.all and fetch.prune decide the scope
 gg update / gg up  fetch --prune --all + pull --rebase --autostash
-gg push / gg p     push, refuse on drift, offer force-with-lease
+gg push / gg p     push; force a rewrite of your own commits only
 gg sync <branch>   pull --rebase origin <branch>, then push
 gg sync            fails: the branch argument is required
 gg abort           abort whichever operation is stuck: rebase, merge, cherry-pick
@@ -313,8 +313,12 @@ merge, since a merge cannot fold into a single parent.
   moves forward again when the last action was an undo. This also makes `gg discard`,
   `gg clear` and branch or tag changes revertible. The newest 100 entries are kept.
 - Every mutating verb ends with a footer: `@ <sha> · ahead N · behind M`.
-- `gg push` never force-pushes on its own. It reports the drift, lists the incoming
-  commits, and asks: update, force-with-lease, or abort. Non-interactive runs refuse.
+- `gg push` force-pushes on its own only when the force would drop nothing but your
+  own commits, and no other remote branch holds them; the lease and
+  `--force-if-includes` still guard the race. On anything else it reports the drift,
+  lists the incoming commits, and asks: update, force-with-lease, or abort.
+  Non-interactive runs refuse. A rewrite that is shared with another branch, or that
+  drops someone else's commit, always asks.
 - User arguments are appended verbatim, so any verb accepts extra git flags.
 
 ## Layout

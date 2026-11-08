@@ -576,6 +576,77 @@ pushed=$(git rev-parse HEAD)
 if git merge-base --is-ancestor "$pushed" HEAD; then no "new --force rewrites the pushed wip"; else ok "new --force rewrites the pushed wip"; fi
 "$BIN" uncommit >/dev/null 2>&1
 
+echo "push forces only your own rewrite"
+BARE=$(mktemp -d)/own.git
+git init -q --bare -b tb "$BARE"
+O=$(mktemp -d)
+git clone -q "$BARE" "$O" 2>/dev/null
+cd "$O" || exit 1
+git config user.email owner@x
+git config user.name owner
+git commit -q --allow-empty -m base
+"$BIN" push </dev/null >/dev/null 2>&1
+echo one > f.txt
+"$BIN" new -m park >/dev/null 2>&1
+git push -q origin tb >/dev/null 2>&1
+echo two >> f.txt
+"$BIN" c -m "real" >/dev/null 2>&1
+out=$("$BIN" push </dev/null 2>&1)
+rc=$?
+assert_eq "push forces my own rewrite without a prompt" "$rc" "0"
+assert_contains "push says it forced with lease" "$out" "rewrote"
+assert_eq "the upstream caught up" "$(git --git-dir="$BARE" rev-parse tb)" "$(git rev-parse HEAD)"
+
+echo "push still asks when the rewrite drops a foreign commit"
+BARE=$(mktemp -d)/own2.git
+git init -q --bare -b tb "$BARE"
+O=$(mktemp -d)
+git clone -q "$BARE" "$O" 2>/dev/null
+cd "$O" || exit 1
+git config user.email owner@x
+git config user.name owner
+git commit -q --allow-empty -m base
+git push -q -u origin tb
+echo one > f.txt
+git add f.txt
+git commit -qm mine
+git push -q origin tb
+T=$(mktemp -d)
+git clone -q "$BARE" "$T" 2>/dev/null
+(cd "$T" && git config user.email other@x && git config user.name other && echo theirs > t.txt && git add t.txt && git commit -qm theirs && git push -q origin tb)
+echo more >> f.txt
+git commit -q --amend --no-edit -a
+out=$("$BIN" push </dev/null 2>&1)
+rc=$?
+assert_eq "push asks and stops non-interactively" "$rc" "1"
+assert_contains "push says why it will not force" "$out" "not forcing"
+assert_contains "push names the foreign author" "$out" "other@x"
+
+echo "push asks when another branch holds the rewrite"
+BARE=$(mktemp -d)/own3.git
+git init -q --bare -b tb "$BARE"
+O=$(mktemp -d)
+git clone -q "$BARE" "$O" 2>/dev/null
+cd "$O" || exit 1
+git config user.email owner@x
+git config user.name owner
+git commit -q --allow-empty -m base
+git push -q -u origin tb
+echo one > f.txt
+git add f.txt
+git commit -qm mine
+git push -q origin tb
+git push -q origin tb:refs/heads/side
+earlier=$(git rev-parse HEAD)
+echo two >> f.txt
+git commit -q --amend --no-edit -a
+git fetch -q origin
+out=$("$BIN" push </dev/null 2>&1)
+rc=$?
+assert_eq "push asks when a branch holds the rewrite" "$rc" "1"
+assert_contains "push names the holding branch" "$out" "origin/side"
+assert_eq "push left the upstream alone" "$(git --git-dir="$BARE" rev-parse tb)" "$earlier"
+
 echo "new refuses what it cannot keep safe"
 R=$(newrepo)
 cd "$R" || exit 1
