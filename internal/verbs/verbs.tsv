@@ -6,7 +6,7 @@
 # abbreviations, printed next to the verb; tokens after it are aliases, printed
 # on the category's aka line.
 # Flags: "hidden" hides the row, "display:..." overrides the name column,
-# "nogit" hides the git command in help -all (verbs dispatched by main's switch).
+# "nogit" hides the git command in hhh (verbs dispatched by main's switch).
 # Mutating verbs get an oplog entry plus a footer.
 # Section headers ("# --- name ---") become the categories in gg help.
 
@@ -43,7 +43,7 @@ absorb|ab	absorb	fold changes into the right commit
 
 # --- Edit saved work ---
 amend	fn:amend	fold changes into HEAD, or into a commit	hint:Takes a changeId
-reword|desc|=rename|describe	fn:reword	edit the message of a commit	hint:Takes a changeId
+describe|desc|=reword|rename	fn:reword	edit the message of a commit	hint:Takes a changeId
 split	fn:split	cut one commit in two	hint:Takes a changeId, then -- paths
 squash	fn:squash	fold a commit into its parent	hint:Takes a changeId
 move|mv	fn:move	replay a commit onto another base	hint:Takes a changeId
@@ -84,4 +84,6 @@ tools	tools	external tools and their install state	nogit
 
 # --- Others ---
 gg	gg	the dashboard: newest branches, one lane each	nogit
-help|h	help	the compact verb table	hint:-p lists params, --all adds descriptions	nogit
+help|h	help	the compact verb table	hint:hh adds params, hhh adds the rest	nogit
+hh	help -p	the table with params and flag variants	nogit
+hhh	help -a	the full table: description, hint, git command	nogit

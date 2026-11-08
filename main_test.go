@@ -68,8 +68,8 @@ func TestWrapItems(t *testing.T) {
 	}
 
 	// a single item wider than the limit still prints whole
-	got = wrapItems([]string{"reword (rename, describe, desc)", "split"}, 20)
-	if got[0] != "reword (rename, describe, desc)" || got[1] != "split" {
+	got = wrapItems([]string{"describe (reword, rename, desc)", "split"}, 20)
+	if got[0] != "describe (reword, rename, desc)" || got[1] != "split" {
 		t.Errorf("oversized item = %q", got)
 	}
 }
@@ -93,7 +93,7 @@ func TestHelpLines(t *testing.T) {
 	}{
 		{"status", "status st", nil},
 		{"branch", "branch br", nil},
-		{"reword", "reword desc", []string{"rename", "describe"}},
+		{"describe", "describe desc", []string{"reword", "rename"}},
 	}
 	for _, c := range cases {
 		e, ok := verbs.Lookup(c.verb)

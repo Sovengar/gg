@@ -42,9 +42,12 @@ func main() {
 }
 
 func run(argv []string) int {
-	// help parses its own flags: -p there means params, not print mode
-	if len(argv) > 0 && (argv[0] == "help" || argv[0] == "h") {
-		return help(argv[1:])
+	// the help words parse their own flags: -p there means params, not print mode
+	if len(argv) > 0 {
+		switch argv[0] {
+		case "help", "h", "hh", "hhh":
+			return help(argv[0], argv[1:])
+		}
 	}
 
 	m, args := parseFlags(argv)
@@ -53,8 +56,8 @@ func run(argv []string) int {
 	}
 
 	switch args[0] {
-	case "help", "h":
-		return help(args[1:])
+	case "help", "h", "hh", "hhh":
+		return help(args[0], args[1:])
 	case "version":
 		fmt.Println("gg " + version)
 		return 0
@@ -415,7 +418,13 @@ func footer(verb string) {
 	fmt.Println(ui.Dim(fmt.Sprintf("  %s · ahead %s · behind %s", changeIndex().Short(sha), ahead, behind)))
 }
 
-func help(argv []string) int {
+func help(word string, argv []string) int {
+	switch word {
+	case "hh":
+		return helpParams()
+	case "hhh":
+		return helpAll()
+	}
 	for _, a := range argv {
 		switch a {
 		case "-all", "--all", "-a":
@@ -463,12 +472,12 @@ func helpParams() int {
 	}
 
 	fmt.Println()
-	fmt.Println(ui.Dim("  gg help --all  adds descriptions and the git command behind each verb"))
+	fmt.Println(ui.Dim("  gg hhh  adds descriptions and the git command behind each verb"))
 	return 0
 }
 
 // helpCompact prints one line of canonical names per category, then one line
-// naming the aliases of that category, verb first: "reword -> rename, describe".
+// naming the aliases of that category, verb first: "describe -> reword, rename".
 // Both lines stay wrapped at COLUMNS so the whole table fits on screen.
 func helpCompact() int {
 	var order []string
@@ -476,7 +485,7 @@ func helpCompact() int {
 	aliases := make(map[string][]cell)
 	for _, e := range verbs.All() {
 		if e.Hidden || e.Variant {
-			continue // variants carry a flag, they belong to gg help -p
+			continue // variants carry a flag, they belong to gg hh
 		}
 		if _, seen := names[e.Category]; !seen {
 			order = append(order, e.Category)
@@ -512,7 +521,7 @@ func helpCompact() int {
 	}
 
 	fmt.Println()
-	fmt.Println(ui.Dim("  gg help --all  adds descriptions, hints and the git command behind each verb"))
+	fmt.Println(ui.Dim("  gg hhh  adds descriptions, hints and the git command behind each verb"))
 	return 0
 }
 
@@ -662,7 +671,7 @@ func helpAll() int {
 		fmt.Println()
 	}
 
-	fmt.Println("  flags: -n/--dry  -p/--print   gg help --all shows all of this")
+	fmt.Println("  flags: -n/--dry  -p/--print   gg hhh shows all of this")
 	fmt.Println("  env: GG_ECHO=1 traces the git call")
 	return 0
 }

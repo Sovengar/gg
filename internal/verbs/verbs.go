@@ -30,9 +30,9 @@ type Entry struct {
 	Category    string
 	Tool        string
 	Hidden      bool
-	Variant     bool   // a flag on another verb, listed by gg help -p only
+	Variant     bool   // a flag on another verb, listed by gg hh only
 	DisplayOnly bool   // a help row with no name to type, e.g. branch -D
-	NoGit       bool   // no git equivalent to show in help -all
+	NoGit       bool   // no git equivalent to show in hhh
 	Shown       string // name column override in help, e.g. status (st, sta, stf)
 	Fn          func(args []string) int
 }
@@ -230,7 +230,7 @@ func Lookup(name string) (Entry, bool) {
 	return e, ok
 }
 
-// splitLabel cuts "reword|desc|=rename|describe" into the canonical name, its
+// splitLabel cuts "describe|desc|=reword|rename" into the canonical name, its
 // abbreviations and its aliases. A "=" starts the alias section.
 func splitLabel(label string) (name string, abbrevs, aliases []string) {
 	inAliases := false
