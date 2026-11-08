@@ -54,8 +54,11 @@ build
 echo "help and registry"
 out=$("$BIN" help)
 assert_contains "help lists status" "$out" "status"
-assert_contains "help lists the aliases" "$out" "aka    st · sta · stf · br"
-assert_contains "help keeps variants off the canonical line" "$(NO_COLOR=1 "$BIN" help | sed -n 1p)" "branch · id"
+assert_contains "help groups a shorthand under its verb" "$out" "status (st)"
+assert_contains "help lists the real aliases" "$out" "aka    branches"
+assert_contains "help keeps variants off the canonical line" "$(NO_COLOR=1 "$BIN" help | sed -n 1p)" "branch (br) · id"
+assert_contains "params names the short status form" "$("$BIN" help -p)" "status -a (sta)"
+assert_contains "params names the files status form" "$("$BIN" help -p)" "status -f (stf)"
 assert_contains "params lists br -r" "$("$BIN" help -p)" "br -r"
 assert_contains "params lists br -a" "$("$BIN" help -p)" "br -a"
 assert_contains "params lists update --check" "$("$BIN" help -p)" "--check fetches, then reports"
@@ -305,6 +308,10 @@ assert_lacks "st keeps only the worktree lanes" "$("$BIN" st)" "[b1]"
 assert_lacks "st lists no files" "$("$BIN" st)" " more"
 assert_contains "stf marks the capped file list" "$("$BIN" stf)" "+2 more"
 assert_eq "stf lists five changed files" "$("$BIN" stf | grep -c '^┊   [AMD] ')" "5"
+assert_eq "st -a lists every changed file" "$("$BIN" st -a | grep -c '^┊   [AMD] ')" "7"
+assert_lacks "st -a lifts the file cap" "$("$BIN" st -a)" "+2 more"
+assert_eq "sta is st -a" "$("$BIN" sta)" "$("$BIN" st -a)"
+assert_eq "stf is st -f" "$("$BIN" stf)" "$("$BIN" st -f)"
 
 R=$(newrepo)
 cd "$R" || exit 1
@@ -319,8 +326,10 @@ git commit -q --allow-empty -m second
 help=$("$BIN" help)
 assert_contains "help groups commit" "$help" "commit"
 assert_contains "help groups push" "$help" "push"
-assert_contains "help lists the commit aliases" "$help" "aka    c · ca · cp"
-assert_contains "help lists the push alias" "$help" "aka    up · p"
+assert_contains "help lists the commit shorthands" "$help" "commit (c, ca)"
+assert_contains "help lists the copy shorthand" "$help" "copy (cp)"
+assert_contains "help lists the update shorthand" "$help" "update (up)"
+assert_contains "help lists the push shorthand" "$help" "push (p)"
 assert_contains "help groups update" "$help" "update"
 changeId=$("$BIN" log 1 | awk '{print $2}')
 "$BIN" edit "$changeId" >/dev/null 2>&1
@@ -402,7 +411,8 @@ assert_contains "help lists wt" "$out" "wt"
 assert_contains "help --all describes new" "$("$BIN" help --all)" "absorb more until you commit"
 assert_contains "help --all describes wt" "$("$BIN" help --all)" "parallel branches, one worktree each"
 assert_contains "help lists discard" "$out" "discard"
-assert_contains "help lists the discard alias" "$out" "aka    cl · rv"
+assert_contains "help lists the clear shorthand" "$out" "clear (cl)"
+assert_contains "help lists the revert shorthand" "$out" "revert (rv)"
 assert_contains "help lists clear" "$out" "clear"
 assert_lacks "help has no cl verb" "$out" "wipe tree and index"
 assert_lacks "help has no cl-wd verb" "$out" "wipe the working tree"

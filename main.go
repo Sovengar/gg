@@ -466,9 +466,8 @@ func helpCompact() int {
 		if _, seen := names[e.Category]; !seen {
 			order = append(order, e.Category)
 		}
-		name, also := splitDisplay(e.Display())
-		names[e.Category] = append(names[e.Category], name)
-		aliases[e.Category] = append(aliases[e.Category], also...)
+		names[e.Category] = append(names[e.Category], e.Display())
+		aliases[e.Category] = append(aliases[e.Category], e.Aliases...)
 	}
 
 	labelWidth := 0
@@ -506,23 +505,6 @@ func helpCompact() int {
 
 // names1 returns the first wrapped line of names, cyan.
 func names1(lines []string) string { return ui.Cyan(lines[0]) }
-
-// splitDisplay cuts "branch (br, b)" into "branch" and [br b].
-func splitDisplay(display string) (string, []string) {
-	open := strings.Index(display, " (")
-	if open < 0 || !strings.HasSuffix(display, ")") {
-		return display, nil
-	}
-	name := display[:open]
-	inner := strings.TrimSuffix(display[open+2:], ")")
-	var aliases []string
-	for _, alias := range strings.Split(inner, ",") {
-		if alias = strings.TrimSpace(alias); alias != "" {
-			aliases = append(aliases, alias)
-		}
-	}
-	return name, aliases
-}
 
 // wrapItems lays items out as one string, breaking between items at width.
 func wrapItems(items []string, width int) []string {

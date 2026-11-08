@@ -1,6 +1,11 @@
 package main
 
-import "testing"
+import (
+	"strings"
+	"testing"
+
+	"gg/internal/verbs"
+)
 
 func TestQuote(t *testing.T) {
 	cases := []struct {
@@ -80,31 +85,27 @@ func TestTermWidth(t *testing.T) {
 	}
 }
 
-func TestSplitDisplay(t *testing.T) {
+func TestHelpLines(t *testing.T) {
 	cases := []struct {
+		verb    string
 		display string
-		name    string
 		aliases []string
 	}{
-		{"log", "log", nil},
-		{"status (st, sta, stf)", "status", []string{"st", "sta", "stf"}},
-		{"branch -c (cbr)", "branch -c", []string{"cbr"}},
-		{"branch -d (dbr)", "branch -d", []string{"dbr"}},
-		{"branch -D (Dbr)", "branch -D", []string{"Dbr"}},
+		{"status", "status (st)", nil},
+		{"branch", "branch (br)", []string{"branches"}},
+		{"reword", "reword (desc)", []string{"rename", "describe"}},
 	}
 	for _, c := range cases {
-		name, aliases := splitDisplay(c.display)
-		if name != c.name {
-			t.Errorf("splitDisplay(%q) name = %q, want %q", c.display, name, c.name)
+		e, ok := verbs.Lookup(c.verb)
+		if !ok {
+			t.Fatalf("%s not found", c.verb)
 		}
-		if len(aliases) != len(c.aliases) {
-			t.Errorf("splitDisplay(%q) aliases = %q, want %q", c.display, aliases, c.aliases)
-			continue
+		if got := e.Display(); got != c.display {
+			t.Errorf("%s Display() = %q, want %q", c.verb, got, c.display)
 		}
-		for i := range c.aliases {
-			if aliases[i] != c.aliases[i] {
-				t.Errorf("splitDisplay(%q) alias %d = %q, want %q", c.display, i, aliases[i], c.aliases[i])
-			}
+		got := strings.Join(e.Aliases, ",")
+		if got != strings.Join(c.aliases, ",") {
+			t.Errorf("%s aliases = %q, want %q", c.verb, got, c.aliases)
 		}
 	}
 }

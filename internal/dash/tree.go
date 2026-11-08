@@ -49,6 +49,7 @@ type view struct {
 	lanes  int
 	newest bool // pick the newest branches, one of them the default
 	files  bool
+	all    bool // list every changed path, not just the first maxFiles
 }
 
 // Tree prints the but-style tree for `gg st`: the uncommitted files, one lane
@@ -59,14 +60,27 @@ func Tree(args []string) int { return tree(args, view{lanes: maxLanes}) }
 // TreeFull prints the same tree with the changed paths under every commit.
 func TreeFull(args []string) int { return tree(args, view{lanes: maxLanes, files: true}) }
 
+// TreeAll prints the full tree with every changed path under every commit.
+func TreeAll(args []string) int {
+	return tree(args, view{lanes: maxLanes, files: true, all: true})
+}
+
 // Run prints the default gg view: the tree over the newest branch lanes. The
 // branch header is left to starship, which already shows it.
 func Run(args []string) int { return tree(args, view{lanes: dashLanes, newest: true}) }
 
 func tree(args []string, opt view) int {
 	n := defaultCommits
-	if len(args) > 0 {
-		if v, err := parsePositive(args[0]); err == nil {
+	for _, a := range args {
+		switch a {
+		case "-a", "--all":
+			opt.files, opt.all = true, true
+			continue
+		case "-f", "--files":
+			opt.files = true
+			continue
+		}
+		if v, err := parsePositive(a); err == nil {
 			n = v
 		}
 	}
@@ -91,7 +105,7 @@ func tree(args []string, opt view) int {
 		for _, row := range l.commits {
 			fmt.Println(ui.Dim("┊") + row.Text)
 			if opt.files {
-				for _, frow := range changedFiles(row.Sha) {
+				for _, frow := range changedFiles(row.Sha, opt.all) {
 					fmt.Println(ui.Dim("┊") + "   " + frow)
 				}
 			}
@@ -189,14 +203,18 @@ func statusLetter(s string) string {
 	return ui.Cyan(s)
 }
 
-// changedFiles lists the paths one commit touches, capped at maxFiles, with a
-// closing count of the paths the cap hides.
-func changedFiles(sha string) []string {
+// changedFiles lists the paths one commit touches. Without all it stops at
+// maxFiles and closes with the count of the paths the cap hides.
+func changedFiles(sha string, all bool) []string {
 	lines, err := gitx.OutputAll("show", "--name-status", "--no-renames", "--format=", sha)
 	if err != nil {
 		return nil
 	}
-	rows := make([]string, 0, maxFiles)
+	cap := maxFiles
+	if all {
+		cap = len(lines)
+	}
+	rows := make([]string, 0, cap)
 	hidden := 0
 	for _, l := range lines {
 		code, path, ok := strings.Cut(l, "\t")
@@ -204,7 +222,7 @@ func changedFiles(sha string) []string {
 		if !ok || path == "" || code == "" {
 			continue
 		}
-		if len(rows) >= maxFiles {
+		if len(rows) >= cap {
 			hidden++
 			continue
 		}

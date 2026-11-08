@@ -21,8 +21,9 @@ GOROOT= ~/.local/share/mise/installs/go/1.27.3/bin/go build -o ~/.local/bin/gg .
 
 ```
 gg                 dashboard: the tree over the five newest branches
-gg status/st/sta    the tree: files, worktree lanes, common base, hints
-gg stf             the same tree, up to five changed files under each commit
+gg status/st       the tree: files, worktree lanes, common base, hints
+gg status -f/stf   the same tree, up to five changed paths under each commit
+gg status -a/sta   the same tree, every changed path, no five-file cap
 gg log             short graph log, 6 commits by default, ✓ pushed / ↑ local
 gg log 20          more of it, extra args go to git log
 gg log -l 40       long line: relative age and author
@@ -77,12 +78,15 @@ Unknown verbs go straight to git: `gg log --oneline -5` runs `git log --oneline 
 Help is grouped by category: Inspection, Rollback work, Register work,
 Edit saved work, Branching, Operations, Remote, Tools, Others. There is no stash: the
 working tree, the index and wip commits are one mechanism (`gg new`, `gg wt`).
-`gg help` (or `gg h`) prints one line of canonical names per category, then a
-grey `aka` line with that category's aliases, so the whole table stays on
-screen. Both lines wrap at `COLUMNS`, 80 by default.
+`gg help` (or `gg h`) prints one line of names per category, then a grey `aka`
+line with that category's aliases, so the whole table stays on screen. Both
+lines wrap at `COLUMNS`, 80 by default. A shorthand sits next to its verb in
+parentheses, e.g. `reword (desc)`; a real alias goes on the `aka` line, e.g.
+`aka rename · describe`.
+`gg help -p` lists the parameter hints and the flag variants, each variant named
+with the command it stands for: `status -a (sta)`, `status -f (stf)`.
 `gg help --all` prints the full table: description, grey parameter hint and the
-git command behind each verb, with the aliases in parentheses after the name,
-e.g. `commit (c, ca)`, `reword (rename, describe, desc)`.
+git command behind each verb.
 
 Flags: `-p/--print`, `-n/--dry` print the resolved command instead of running.
 Environment: `GG_ECHO=1` traces the git call, `NO_COLOR=1` disables colour.
@@ -214,9 +218,10 @@ green, yellow and dim. A merge line also lists both sides it joined, as
 
 Bare `gg` prints the tree over the five newest branches, the default branch
 among them. `gg status` narrows the lanes to real worktrees: the current branch
-first, then every branch a sibling worktree holds. `gg stf` adds, under every
-commit, up to five changed paths and a `+N more` tail. No header line: starship
-already shows the branch, the drift and the wip state.
+first, then every branch a sibling worktree holds. `gg status -f` (alias `stf`)
+adds, under every commit, up to five changed paths and a `+N more` tail;
+`gg status -a` (alias `sta`) lists every changed path instead. No header line:
+starship already shows the branch, the drift and the wip state.
 
 The shape follows `but status`: one lane for the uncommitted files, one lane
 per branch, the common base and two hints.

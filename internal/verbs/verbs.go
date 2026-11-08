@@ -20,8 +20,10 @@ var registry string
 // Entry is one gg verb. Fn means a Go function, Tool means an external
 // binary, anything else runs git with Snippet + args.
 type Entry struct {
-	Name        string // canonical name, the first alias
-	Label       string // aliases as written in the registry, e.g. "commit|c"
+	Name        string   // canonical name, the first token
+	Label       string   // names as written in the registry, e.g. "commit|c|=ca"
+	Abbrevs     []string // short forms: types on the verb line, e.g. c
+	Aliases     []string // other names: types on the aka line, e.g. ca
 	Snippet     string
 	Description string
 	Hint        string // grey parameter note shown after the description
@@ -55,6 +57,7 @@ var functions = map[string]func([]string) int{
 	"dash":         dash.Run,
 	"tree":         dash.Tree,
 	"treeFull":     dash.TreeFull,
+	"treeAll":      dash.TreeAll,
 	"diff":         diffview.Run,
 	"branches":     ops.Branches,
 	"deleteBranch": ops.DeleteBranch,
@@ -148,11 +151,12 @@ func parse(src string) (map[string]Entry, []Entry) {
 		if name == "" {
 			continue
 		}
-		aliases := strings.Split(name, "|")
-		canonical := strings.TrimSpace(aliases[0])
+		canonical, abbrevs, aliases := splitLabel(name)
 		entry := Entry{
 			Name:        canonical,
 			Label:       name,
+			Abbrevs:     abbrevs,
+			Aliases:     aliases,
 			Snippet:     snippet,
 			Description: strings.TrimSpace(description),
 			Category:    category,
@@ -192,8 +196,9 @@ func parse(src string) (map[string]Entry, []Entry) {
 			entry.Snippet = strings.Join(fields[1:], " ")
 		}
 		list = append(list, entry)
-		for _, alias := range aliases {
-			if alias = strings.TrimSpace(alias); alias != "" {
+		for _, alias := range strings.Split(name, "|") {
+			alias = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(alias), "="))
+			if alias != "" {
 				out[alias] = entry
 			}
 		}
@@ -220,6 +225,31 @@ func Lookup(name string) (Entry, bool) {
 	return e, ok
 }
 
+// splitLabel cuts "reword|desc|=rename|describe" into the canonical name, its
+// abbreviations and its aliases. A "=" starts the alias section.
+func splitLabel(label string) (name string, abbrevs, aliases []string) {
+	inAliases := false
+	for i, token := range strings.Split(label, "|") {
+		token = strings.TrimSpace(token)
+		if rest, ok := strings.CutPrefix(token, "="); ok {
+			inAliases = true
+			token = strings.TrimSpace(rest)
+		}
+		if token == "" {
+			continue
+		}
+		switch {
+		case i == 0 && !inAliases:
+			name = token
+		case inAliases:
+			aliases = append(aliases, token)
+		default:
+			abbrevs = append(abbrevs, token)
+		}
+	}
+	return name, abbrevs, aliases
+}
+
 // Names returns verb names in registry order.
 func Names() []string {
 	var names []string
@@ -228,7 +258,8 @@ func Names() []string {
 			continue
 		}
 		for _, alias := range strings.Split(e.Label, "|") {
-			if alias = strings.TrimSpace(alias); alias != "" {
+			alias = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(alias), "="))
+			if alias != "" {
 				names = append(names, alias)
 			}
 		}
@@ -243,20 +274,17 @@ func IsMutating(name string) bool { return mutating[name] }
 func All() []Entry { return append([]Entry(nil), rows...) }
 
 // Describe is the one-line help text for the verb.
-// Display is the name column in help: the canonical name first, the shorter
-// variants in parentheses, or the explicit display: override when set.
+// Display is the name column in help: the canonical name, then its
+// abbreviations in parentheses, or the explicit display: override when set.
+// Aliases are left to the aka line of the compact help.
 func (e Entry) Display() string {
 	if e.Shown != "" {
 		return e.Shown
 	}
-	aliases := strings.Split(e.Label, "|")
-	for i := range aliases {
-		aliases[i] = strings.TrimSpace(aliases[i])
+	if len(e.Abbrevs) == 0 {
+		return e.Name
 	}
-	if len(aliases) < 2 {
-		return aliases[0]
-	}
-	return aliases[0] + " (" + strings.Join(aliases[1:], ", ") + ")"
+	return e.Name + " (" + strings.Join(e.Abbrevs, ", ") + ")"
 }
 
 // Command is the git command behind the verb, empty when there is none to show.

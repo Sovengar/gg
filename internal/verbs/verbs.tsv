@@ -2,21 +2,24 @@
 # A snippet is a git argv (git is implied). User args are appended verbatim.
 # "fn:<name>" dispatches to a Go function, "tool:<bin>" to an external binary.
 # A "hint:" field adds a grey parameter note after the description.
+# The verb cell reads "name|short...|=alias|alias": tokens before "=" are
+# abbreviations, printed next to the verb; tokens after it are aliases, printed
+# on the category's aka line.
 # Flags: "hidden" hides the row, "display:..." overrides the name column,
 # "nogit" hides the git command in help -all (verbs dispatched by main's switch).
 # Mutating verbs get an oplog entry plus a footer.
 # Section headers ("# --- name ---") become the categories in gg help.
 
 # --- Inspection ---
-status|st	fn:tree	Overview of the workspace: files, branches, commits	display:status (st, sta, stf)
-sta	fn:tree	-	hidden
-stf	fn:treeFull	-	hidden
+status|st	fn:tree	Overview of the workspace: files, branches, commits	hint:Takes a count
+sta	fn:treeAll	every changed path under every commit	hint:st -a shows all, st -f stops at five	display:status -a (sta)	variant
+stf	fn:treeFull	up to five changed paths under every commit	hint:st -a lifts the cap	display:status -f (stf)	variant
 
 log	fn:log	graph log, 6 commits by default	hint:Takes a count, -l for long lines
 dash	fn:dash	dashboard: the tree over the newest branches	hidden
 diff	fn:diff	diff the tree in boxes	hint:Use -w to ignore whitespace
 show	show	one commit in full	hint:Takes a changeId
-branch|br|branches	fn:branches	list branches, or switch to one	hint:bare lists local changeIds. -r remote, -a both, new <name> creates	display:branch (br)
+branch|br|=branches	fn:branches	list branches, or switch to one	hint:bare lists local changeIds. -r remote, -a both, new <name> creates
 brr	branch -r	remote branches, straight from git	display:br -r	variant
 bra	branch -a	local and remote branches in one list	display:br -a	variant
 id	id	resolve a changeId to a sha	nogit
@@ -38,7 +41,7 @@ absorb	absorb	fold changes into the right commit
 
 # --- Edit saved work ---
 amend	fn:amend	fold changes into HEAD, or into a commit	hint:Takes a changeId
-reword|rename|describe|desc	fn:reword	edit the message of a commit	hint:Takes a changeId
+reword|desc|=rename|describe	fn:reword	edit the message of a commit	hint:Takes a changeId
 split	fn:split	cut one commit in two	hint:Takes a changeId, then -- paths
 squash	fn:squash	fold a commit into its parent	hint:Takes a changeId
 move	fn:move	replay a commit onto another base	hint:Takes a changeId
