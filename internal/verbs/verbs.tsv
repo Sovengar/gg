@@ -18,7 +18,6 @@ clone	fn:clone	git clone, then colocate a jj repo on top	hint:Takes a url, then 
 status|st	fn:tree	Overview of the workspace: files, branches, commits	hint:Takes a count
 sta	fn:treeAll	every changed path under every commit	hint:st -a shows all, st -f stops at five	display:status -a sta	variant
 stf	fn:treeFull	up to five changed paths under every commit	hint:st -a lifts the cap	display:status -f stf	variant
-
 log|l	fn:log	graph log, 6 commits by default	hint:Takes a count, -l for long lines
 dash	fn:dash	dashboard: the tree over the newest branches	hidden
 diff	fn:diff	diff the tree in boxes	hint:Use -w to ignore whitespace
@@ -27,8 +26,7 @@ branch|br	fn:branches	list branches, or switch to one	hint:bare lists local chan
 brr	branch -r	remote branches, straight from git	display:br -r	variant
 bra	fn:stack	the branch stacks, each branch under the one it was cut from	display:br -a	variant
 brg	branch -a	local and remote branches in one list	display:br -g	variant
-changeId|id	id	resolve a changeId to a sha	nogit
-
+story	tool:gitlogue	animated history replay
 
 # --- Rollback work ---
 discard|d	fn:discard	drop edits, keep new files	hint:Bare drops all. Takes a changeId or a path
@@ -59,8 +57,8 @@ cbr	switch -c	branch new and switch	hint:Takes a branch. branch new <name> works
 dbr	fn:deleteBranch	delete a branch, tip kept in a ref	hint:Safe: unmerged commits stay. Takes a branch or a changeId	display:branch -d dbr	variant
 Dbr	fn:deleteBranchForce	delete a branch even when unmerged	hint:Force. Drops unmerged commits, keeps the tip ref	display:branch -D Dbr	variant
 mg	merge	merge a branch into this one	hint:Takes a branch
-conflict|cf	mergetool	resolve conflicts with the configured tool	hint:Takes a path, or every conflicted one
 wt	fn:wt	parallel branches, one worktree each	hint:Takes new|ls|rm
+mzt	tool:git-machete	branch layout maintenance
 
 # --- Operations ---
 reflog	reflog	where HEAD has been
@@ -69,32 +67,30 @@ continue	fn:continue	resume a stopped rebase
 abort	fn:abort	abort whichever operation is stuck	hint:--keep preserves the live worktree changes
 redo	fn:redo	step forward again after an undo
 oplog	fn:oplog	the operations undo can reach	hint:Takes clear to drop the log
+conflict|cf	mergetool	resolve conflicts with the configured tool	hint:Takes a path, or every conflicted one
 
 # --- Remote ---
 update|up	fn:update	fetch and rebase on the upstream	hint:--check fetches, then reports without rebasing
 push|p	fn:push	push, refuse on drift
 sync|s	fn:sync	rebase on a branch, then push	hint:Takes a branch
-
-# --- Forge ---
+remote	fn:remote	configured remotes, or add, rename and remove them	hint:Bare lists names and urls
 pr	fn:prNew	create a PR for this branch	hint:-d drafts. A stacked branch bases on its parent
+land	fn:land	land a branch on the target, no PR, no CI	hint:Takes a branch, -b <target>, -y skips the question
 rpr	fn:prReview	review a PR in its own worktree	hint:Takes a number	display:pr review rpr	variant
 epr	fn:prReviewEdit	review a PR with its diff live	hint:Takes a number. Soft reset on the base	display:pr review -e epr	variant
+prdash	tool:prdash	PR dashboard over the open PRs
 
-# --- Tools ---
-story	tool:gitlogue	animated history replay
-mzt	tool:git-machete	branch layout maintenance
+# --- Others ---
+changeId|id	id	resolve a changeId to a sha	nogit
+hooks	fn:hooks	install the Change-Id hook
 sim	tool:git-sim	render an operation before running
 hunk	tool:hunk	review a diff in Hunk	hint:Takes diff, show, or a revision
 tuicr	tool:tuicr	code review TUI	hint:Takes a revset, -w for the working tree
 but	tool:but	the GitButler CLI	hint:Takes any but subcommand
 jj	tool:jj	Jujutsu	hint:Takes any jj command
 lazygit	tool:lazygit	a terminal git UI	hint:Takes git arguments
-prdash	tool:prdash	PR dashboard over the open PRs
 gitdash	tool:gitdash	workspace dashboard	hint:-print prints the status table instead
-hooks	fn:hooks	install the Change-Id hook
 tools	tools	external tools and their install state	nogit
-
-# --- Others ---
 gg	gg	the dashboard: newest branches, one lane each	nogit
 help|h	help	the compact verb table	hint:-v adds a description per verb, hh the parameters	nogit
 hh	help	the table with the flag variants merged into their verb	hint:-v adds the parameters and their hints	nogit

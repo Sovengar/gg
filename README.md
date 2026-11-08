@@ -88,7 +88,7 @@ gg tools           external tools + install state
 Unknown verbs go straight to git: `gg log --oneline -5` runs `git log --oneline -5`.
 
 Help is grouped by category: Inspection, Rollback work, Register work,
-Edit saved work, Branching, Operations, Remote, Forge, Tools, Others. There is no stash: the
+Edit saved work, Branching, Operations, Remote, Others. There is no stash: the
 working tree, the index and wip commits are one mechanism (`gg new`, `gg wt`).
 `gg help` (or `gg h`) prints one line of names per category, then a grey line
 with that category's aliases, verb first: `describe -> reword, rename`. Both
