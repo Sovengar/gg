@@ -35,7 +35,7 @@ revert|rv	fn:revert	undo one commit with a new commit	hint:Takes a changeId, -m 
 
 # --- Register work ---
 commit|c	fn:commit	save the changes you name, or all of them	hint:Add a message with -m. A changeId names one change.
-ca	fn:commit	save every change, the way commit already does	hint:-a is implied, the flag is accepted	variant	display:commit -a ca
+ce	fn:commitExclude	save every change except the ones you name	hint:Add -m. The named changeIds are the ones left out	variant	display:commit -e ce
 new	fn:new	save the changes, absorb more until you commit	hint:Add -m <msg>. --force rewrites a pushed wip.
 empty	commit --allow-empty	record an empty commit
 copy|cp	fn:copy	copy a commit onto a branch	hint:Takes a changeId, then a branch

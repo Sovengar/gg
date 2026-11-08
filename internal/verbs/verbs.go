@@ -21,9 +21,9 @@ var registry string
 // binary, anything else runs git with Snippet + args.
 type Entry struct {
 	Name        string   // canonical name, the first token
-	Label       string   // names as written in the registry, e.g. "commit|c|=ca"
+	Label       string   // names as written in the registry, e.g. "commit|c|=reword|rename"
 	Abbrevs     []string // short forms: types on the verb line, e.g. c
-	Aliases     []string // other names: types on the aka line, e.g. ca
+	Aliases     []string // other names: types on the aka line, e.g. rename
 	Snippet     string
 	Description string
 	Hint        string // grey parameter note shown after the description
@@ -83,12 +83,15 @@ var functions = map[string]func([]string) int{
 	"prReviewEdit": ops.PRReviewEdit,
 	"new":          ops.New,
 	"commit":       ops.Commit,
-	"discard":      ops.Discard,
-	"clear":        ops.Clear,
-	"copy":         ops.Copy,
-	"undo":         undo,
-	"redo":         redo,
-	"oplog":        oplogList,
+	"commitExclude": func(args []string) int {
+		return ops.Commit(append([]string{"-e"}, args...))
+	},
+	"discard": ops.Discard,
+	"clear":   ops.Clear,
+	"copy":    ops.Copy,
+	"undo":    undo,
+	"redo":    redo,
+	"oplog":   oplogList,
 }
 
 func undo(args []string) int {
@@ -121,7 +124,7 @@ func oplogList(args []string) int {
 
 // mutating verbs get an oplog entry and a footer.
 var mutating = map[string]bool{
-	"commit": true, "c": true, "ca": true, "amend": true, "uncommit": true,
+	"commit": true, "c": true, "ce": true, "amend": true, "uncommit": true,
 	"split": true, "squash": true, "absorb": true, "empty": true,
 	"move": true, "publish": true, "sync": true, "update": true,
 	"abandon": true, "copy": true, "cp": true, "push": true, "p": true, "up": true,
@@ -310,7 +313,7 @@ func (e Entry) Parent() (Entry, bool) {
 }
 
 // VariantFlag is what a variant row adds to its parent's cell, the display
-// text minus the parent verb: "commit -a ca" gives "-a ca".
+// text minus the parent verb: "commit -e ce" gives "-e ce".
 func (e Entry) VariantFlag() string {
 	_, flag, found := strings.Cut(e.Display(), " ")
 	if !found {

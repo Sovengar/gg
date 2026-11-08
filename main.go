@@ -218,7 +218,7 @@ func fileIndex() *files.Index {
 // pathVerbs are the only verbs where a file changeId may replace an argument.
 var pathVerbs = map[string]bool{
 	"diff": true, "rs": true, "restore": true,
-	"commit": true, "c": true, "ca": true, "discard": true,
+	"commit": true, "c": true, "ce": true, "discard": true,
 }
 
 func pathVerb(name string) bool { return pathVerbs[name] }

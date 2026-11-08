@@ -65,7 +65,7 @@ assert_contains "hh merges the status variants into one cell" "$("$BIN" hh)" "st
 assert_contains "hh merges the branch variants" "$("$BIN" hh)" "branch br, -lr, -a, -la, -lm, -c cbr, -d dbr, -D Dbr"
 assert_lacks "hh drops the positional branch row" "$("$BIN" hh)" "<name>"
 assert_contains "hh -v keeps the positional branch row" "$("$BIN" hh -v)" "branch <name>"
-assert_contains "hh merges the commit variant" "$("$BIN" hh)" "commit c, -a ca"
+assert_contains "hh merges the commit variant" "$("$BIN" hh)" "commit c, -e ce"
 assert_contains "hh keeps the aliases" "$("$BIN" hh)" "describe -> reword, rename"
 assert_contains "hh -v names the short status form" "$("$BIN" hh -v)" "status -a sta"
 assert_contains "hh -v names the files status form" "$("$BIN" hh -v)" "status -f stf"
@@ -121,6 +121,23 @@ assert_contains "footer printed" "$("$BIN" c --allow-empty -m footer 2>&1)" "ahe
 "$BIN" undo >/dev/null
 assert_eq "undo went back" "$(git log --oneline | wc -l | tr -d ' ')" "2"
 if [ -f f.txt ]; then ok "undo keeps files"; else no "undo keeps files"; fi
+
+echo "commit -e excludes"
+R=$(newrepo)
+cd "$R" || exit 1
+echo a > a.txt
+echo b > b.txt
+echo c > c.txt
+"$BIN" ce -m "all but b" b.txt >/dev/null 2>&1
+assert_eq "ce commits the rest" "$(git show --name-only --format= HEAD | tr '\n' ' ')" "a.txt c.txt "
+assert_eq "ce leaves the excluded file dirty" "$(git status --porcelain)" "?? b.txt"
+assert_eq "ce commits one change" "$(git log --format=%s -1)" "all but b"
+if "$BIN" ce -m nope zzzz 2>/dev/null; then no "ce guards unknown changeIds"; else ok "ce guards unknown changeIds"; fi
+if "$BIN" ce -m nope b.txt; then no "ce guards an empty commit"; else ok "ce guards an empty commit"; fi
+echo d > d.txt
+"$BIN" c -e -m "explicit flag" b.txt >/dev/null 2>&1
+assert_eq "commit -e is the same verb" "$(git log --format=%s -1)" "explicit flag"
+assert_eq "commit -e leaves the file dirty" "$(git status --porcelain)" "?? b.txt"
 
 echo "oplog, undo and redo"
 R=$(newrepo)
@@ -342,7 +359,7 @@ assert_contains "help groups commit" "$help" "commit"
 assert_contains "help groups push" "$help" "push"
 assert_contains "help lists the commit shorthand" "$help" "commit c"
 assert_contains "help lists the absorb shorthand" "$help" "absorb ab"
-assert_contains "hh -v lists the commit -a form" "$("$BIN" hh -v)" "commit -a ca"
+assert_contains "hh -v lists the commit -e form" "$("$BIN" hh -v)" "commit -e ce"
 assert_contains "help lists the copy shorthand" "$help" "copy cp"
 assert_contains "help lists the update shorthand" "$help" "update up"
 assert_contains "help lists the push shorthand" "$help" "push p"

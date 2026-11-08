@@ -15,9 +15,21 @@ var commitFlags = map[string]bool{
 }
 
 // Commit records the named changes, or every dirty path when none is named.
+// With -e the names are the ones left out, the way `gg ce` runs it.
 // The index stays an implementation detail: no verb asks the user to stage.
 func Commit(args []string) int {
 	flags, paths := splitCommitArgs(args)
+	flags, exclude := takeExclude(flags)
+	if exclude {
+		if gitx.InWip() {
+			ui.Errf("gg ce: HEAD is a wip commit. Run gg uncommit first, then gg ce.")
+			return 1
+		}
+		var rc int
+		if paths, rc = keepDirty(paths); rc != 0 {
+			return rc
+		}
+	}
 	if gitx.InWip() {
 		return finalizeWip(flags, paths)
 	}
@@ -30,6 +42,83 @@ func Commit(args []string) int {
 	markIntent(paths)
 	argv := append([]string{"commit"}, flags...)
 	return gitx.Run(append(append(argv, "--"), paths...)...)
+}
+
+// takeExclude drops -e from the flags and reports whether it was there.
+func takeExclude(flags []string) ([]string, bool) {
+	kept := flags[:0]
+	exclude := false
+	for _, f := range flags {
+		switch f {
+		case "-e", "--exclude":
+			exclude = true
+		default:
+			kept = append(kept, f)
+		}
+	}
+	return kept, exclude
+}
+
+// keepDirty returns every dirty path that the excluded names do not cover.
+// A name covers itself and, when it names a directory, what sits under it.
+func keepDirty(excluded []string) ([]string, int) {
+	all, err := dirtyPaths()
+	if err != nil {
+		ui.Errf("gg ce: cannot read the dirty paths")
+		return nil, 1
+	}
+	covered := func(p string) bool {
+		for _, ex := range excluded {
+			if p == ex || strings.HasPrefix(p, strings.TrimSuffix(ex, "/")+"/") {
+				return true
+			}
+		}
+		return false
+	}
+	for _, ex := range excluded {
+		found := false
+		for _, p := range all {
+			if p == ex || strings.HasPrefix(p, strings.TrimSuffix(ex, "/")+"/") {
+				found = true
+				break
+			}
+		}
+		if !found {
+			ui.Errf("gg ce: %s is not a dirty path", ex)
+			return nil, 1
+		}
+	}
+	var keep []string
+	for _, p := range all {
+		if !covered(p) {
+			keep = append(keep, p)
+		}
+	}
+	if len(keep) == 0 {
+		ui.Errf("gg ce: that leaves no dirty path to commit")
+		return nil, 1
+	}
+	return keep, 0
+}
+
+// dirtyPaths lists every changed path, new files included.
+func dirtyPaths() ([]string, error) {
+	lines, err := gitx.OutputAll("status", "--porcelain", "--untracked-files=all")
+	if err != nil {
+		return nil, err
+	}
+	var paths []string
+	for _, line := range lines {
+		if strings.HasPrefix(line, "## ") || len(line) < 4 {
+			continue
+		}
+		p := strings.TrimSpace(line[3:])
+		if i := strings.Index(p, " -> "); i >= 0 {
+			p = p[i+4:]
+		}
+		paths = append(paths, p)
+	}
+	return paths, nil
 }
 
 // finalizeWip turns the wip commit into the real one and drops the marker.

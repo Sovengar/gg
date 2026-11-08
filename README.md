@@ -39,8 +39,9 @@ gg diff            diff in boxes, one per change (plain git diff when piped)
 gg diff -w         diff ignoring whitespace
 gg copy kd main    copy that commit onto main, back on your branch after (alias: cp)
 gg copy kd         copy it onto the branch you are on
-gg c -m "msg"      commit every dirty path (alias: commit; ca means commit -a)
+gg c -m "msg"      commit every dirty path (alias: commit; ce excludes)
 gg c -m "msg" kd qz  commit only those changeIds
+gg ce -m "msg" kd    commit every dirty path except kd (commit -e; alias: ce)
 gg discard kd      drop that change, keep the rest; undoable with gg undo
 gg discard         drop every edit, keep the new files
 gg clear           drop every edit and delete the new files (-f skips the question)
