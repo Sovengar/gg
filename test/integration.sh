@@ -58,8 +58,8 @@ echo "help and registry"
 out=$("$BIN" help)
 assert_contains "help lists status" "$out" "status"
 assert_contains "help groups a shorthand under its verb" "$out" "status (st)"
-assert_contains "help lists the real aliases" "$out" "aka    branches"
-assert_contains "help keeps variants off the canonical line" "$(NO_COLOR=1 "$BIN" help | sed -n 1p)" "branch (br) · id"
+assert_lacks "help has no branches alias" "$out" "branches"
+assert_contains "help keeps variants off the canonical line" "$(NO_COLOR=1 "$BIN" help | sed -n 1p)" "branch (br) · changeId (id)"
 assert_contains "params names the short status form" "$("$BIN" help -p)" "status -a (sta)"
 assert_contains "params names the files status form" "$("$BIN" help -p)" "status -f (stf)"
 assert_contains "params lists br -r" "$("$BIN" help -p)" "br -r"
@@ -269,7 +269,8 @@ case "$changeId" in
 ??|???|????) ok "log shows a bare changeId" ;;
 *) no "log shows a bare changeId (got: $changeId)" ;;
 esac
-assert_contains "id resolves the changeId" "$("$BIN" id "$changeId")" "$changeId"
+assert_contains "changeId resolves the changeId" "$("$BIN" changeId "$changeId")" "$changeId"
+assert_contains "id still resolves it" "$("$BIN" id "$changeId")" "$changeId"
 sha_len=$("$BIN" id "$changeId" | awk '{print length($2)}')
 assert_eq "id prints a full sha" "$sha_len" "40"
 assert_contains "changeId resolves inside a verb" "$("$BIN" -p show "$changeId")" "git show"
@@ -363,7 +364,7 @@ assert_contains "split prints" "$("$BIN" -p split ab -- f.txt)" "gg split ab -- 
 
 echo "renamed verbs"
 assert_contains "reflog verb" "$("$BIN" -p reflog)" "reflog"
-assert_contains "branches verb" "$("$BIN" -p branches)" "gg branches"
+assert_eq "branches verb is gone" "$("$BIN" -p branches)" "git branches"
 assert_contains "br alias" "$("$BIN" -p br trunk)" "gg br trunk"
 assert_contains "branch verb" "$("$BIN" -p branch)" "gg branch"
 assert_contains "log alias renders" "$("$BIN" -p log 3)" "gg log 3"

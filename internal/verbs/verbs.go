@@ -291,6 +291,16 @@ func (e Entry) Display() string {
 	return e.Name + " (" + strings.Join(e.Abbrevs, ", ") + ")"
 }
 
+// DisplayParts cuts Display() into the plain name and the shorthand note,
+// parentheses included, empty when the name carries no abbreviation.
+func (e Entry) DisplayParts() (name, note string) {
+	display := e.Display()
+	if i := strings.LastIndex(display, " ("); i >= 0 && strings.HasSuffix(display, ")") {
+		return display[:i], display[i:]
+	}
+	return display, ""
+}
+
 // Command is the git command behind the verb, empty when there is none to show.
 func (e Entry) Command() string {
 	if e.NoGit {

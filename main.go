@@ -65,7 +65,7 @@ func run(argv []string) int {
 		return 0
 	case "tools":
 		return tools()
-	case "id":
+	case "changeId", "id":
 		return showIDs(args[1:])
 	case "__seq-edit":
 		return ops.SeqEdit(args[1:])
@@ -446,7 +446,7 @@ func helpParams() int {
 		if note == "" && e.Variant {
 			note = "same verb, other flag"
 		}
-		fmt.Printf("  %s  %s\n", ui.Cyan(fmt.Sprintf("%-*s", nameWidth, e.Display())), ui.Dim(note))
+		fmt.Printf("  %s  %s\n", displayPadded(e, nameWidth), ui.Dim(note))
 	}
 
 	fmt.Println()
@@ -458,7 +458,7 @@ func helpParams() int {
 // aliases. Both lines stay wrapped at COLUMNS so the whole table fits on screen.
 func helpCompact() int {
 	var order []string
-	names := make(map[string][]string)
+	names := make(map[string][]cell)
 	aliases := make(map[string][]string)
 	for _, e := range verbs.All() {
 		if e.Hidden || e.Variant {
@@ -467,7 +467,7 @@ func helpCompact() int {
 		if _, seen := names[e.Category]; !seen {
 			order = append(order, e.Category)
 		}
-		names[e.Category] = append(names[e.Category], e.Display())
+		names[e.Category] = append(names[e.Category], displayCell(e))
 		aliases[e.Category] = append(aliases[e.Category], e.Aliases...)
 	}
 
@@ -482,10 +482,10 @@ func helpCompact() int {
 	width := termWidth() - gutter - labelWidth
 
 	for _, category := range order {
-		lines := wrapItems(names[category], width)
-		fmt.Printf("  %s  %s\n", ui.Cyan(fmt.Sprintf("%-*s", labelWidth, category)), names1(lines))
+		lines := wrapCells(names[category], width)
+		fmt.Printf("  %s  %s\n", ui.Cyan(fmt.Sprintf("%-*s", labelWidth, category)), lines1(lines))
 		for _, line := range lines[1:] {
-			fmt.Printf("%s%s\n", indent, line)
+			fmt.Printf("%s%s\n", indent, joinCells(line))
 		}
 		if len(aliases[category]) == 0 {
 			continue
@@ -504,8 +504,64 @@ func helpCompact() int {
 	return 0
 }
 
-// names1 returns the first wrapped line of names, cyan.
-func names1(lines []string) string { return ui.Cyan(lines[0]) }
+// cell is one help item: its plain text and the same text painted.
+type cell struct{ plain, styled string }
+
+// displayCell paints a verb name cyan and its shorthand note dim.
+func displayCell(e verbs.Entry) cell {
+	name, note := e.DisplayParts()
+	styled := ui.Cyan(name)
+	if note != "" {
+		styled += ui.Dim(note)
+	}
+	return cell{plain: e.Display(), styled: styled}
+}
+
+// displayPadded is displayCell padded to width, padding left plain.
+func displayPadded(e verbs.Entry, width int) string {
+	c := displayCell(e)
+	if pad := width - len(c.plain); pad > 0 {
+		c.styled += strings.Repeat(" ", pad)
+	}
+	return c.styled
+}
+
+// lines1 renders the first wrapped line of cells.
+func lines1(lines [][]cell) string { return joinCells(lines[0]) }
+
+// joinCells glues cells with the item separator, each one painted.
+func joinCells(cells []cell) string {
+	parts := make([]string, len(cells))
+	for i, c := range cells {
+		parts[i] = c.styled
+	}
+	return strings.Join(parts, " · ")
+}
+
+// wrapCells lays cells out left to right, breaking between cells at width.
+// Widths are measured on the plain text, so the paint never shifts a column.
+func wrapCells(cells []cell, width int) [][]cell {
+	if width < 20 {
+		width = 20
+	}
+	var lines [][]cell
+	var line []cell
+	size := 0
+	for _, c := range cells {
+		n := utf8.RuneCountInString(c.plain)
+		switch {
+		case len(line) == 0:
+			line, size = []cell{c}, n
+		case size+n+3 <= width:
+			line = append(line, c)
+			size += n + 3
+		default:
+			lines = append(lines, line)
+			line, size = []cell{c}, n
+		}
+	}
+	return append(lines, line)
+}
 
 // wrapItems lays items out as one string, breaking between items at width.
 func wrapItems(items []string, width int) []string {
@@ -573,7 +629,7 @@ func helpAll() int {
 			if e.Hidden {
 				continue
 			}
-			line := fmt.Sprintf("  %s  %-*s", ui.Cyan(fmt.Sprintf("%-*s", nameWidth, e.Display())), descWidth, e.Description)
+			line := fmt.Sprintf("  %s  %-*s", displayPadded(e, nameWidth), descWidth, e.Description)
 			if e.Hint != "" {
 				line += "  " + ui.Dim(e.Hint)
 			}

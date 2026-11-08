@@ -19,10 +19,10 @@ log	fn:log	graph log, 6 commits by default	hint:Takes a count, -l for long lines
 dash	fn:dash	dashboard: the tree over the newest branches	hidden
 diff	fn:diff	diff the tree in boxes	hint:Use -w to ignore whitespace
 show	show	one commit in full	hint:Takes a changeId
-branch|br|=branches	fn:branches	list branches, or switch to one	hint:bare lists local changeIds. -r remote, -a both, new <name> creates
+branch|br	fn:branches	list branches, or switch to one	hint:bare lists local changeIds. -r remote, -a both, new <name> creates
 brr	branch -r	remote branches, straight from git	display:br -r	variant
 bra	branch -a	local and remote branches in one list	display:br -a	variant
-id	id	resolve a changeId to a sha	nogit
+changeId|id	id	resolve a changeId to a sha	nogit
 
 
 # --- Rollback work ---
@@ -49,8 +49,8 @@ edit	fn:edit	stop a rebase at a commit	hint:Takes a changeId
 
 # --- Branching ---
 branch switch	fn:branches	change branch	hint:Takes a branch	display:branch (br)	displayonly
-cbr	switch -c	branch new and switch	hint:Takes a branch. branch new <name> works too	display:branch -c (cbr)
-dbr	fn:deleteBranch	delete a branch, tip kept in a ref	hint:Safe: unmerged commits stay. Takes a branch or a changeId	display:branch -d (dbr)
+cbr	switch -c	branch new and switch	hint:Takes a branch. branch new <name> works too	display:branch -c (cbr)	variant
+dbr	fn:deleteBranch	delete a branch, tip kept in a ref	hint:Safe: unmerged commits stay. Takes a branch or a changeId	display:branch -d (dbr)	variant
 Dbr	fn:deleteBranchForce	delete a branch even when unmerged	hint:Force. Drops unmerged commits, keeps the tip ref	display:branch -D (Dbr)	variant
 mg	merge	merge a branch into this one	hint:Takes a branch
 wt	fn:wt	parallel branches, one worktree each	hint:Takes new|ls|rm

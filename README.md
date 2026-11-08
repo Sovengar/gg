@@ -176,7 +176,7 @@ two-character prefix works when it is unambiguous:
 
 ```
 gg show @nan       git show trunk
-gg id @nan         @nan 641682b7a6c27c7273086ea06574b451742d5792  (trunk)
+gg changeId @nan   @nan 641682b7a6c27c7273086ea06574b451742d5792  (trunk)
 gg diff @na        resolves, then diffs
 ```
 

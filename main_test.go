@@ -92,7 +92,7 @@ func TestHelpLines(t *testing.T) {
 		aliases []string
 	}{
 		{"status", "status (st)", nil},
-		{"branch", "branch (br)", []string{"branches"}},
+		{"branch", "branch (br)", nil},
 		{"reword", "reword (desc)", []string{"rename", "describe"}},
 	}
 	for _, c := range cases {
