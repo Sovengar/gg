@@ -30,6 +30,9 @@ assert_lacks() { # name, haystack, needle
 	esac
 }
 
+wipfile() { git rev-parse --git-path gg/wip; }
+wipsha() { cat "$(wipfile)" 2>/dev/null || echo gone; }
+
 build() {
 	if (cd "$REPO" && GOFLAGS=-buildvcs=false "$GO" build -o "$BIN" .); then
 		return 0
@@ -424,26 +427,27 @@ echo hi > f.txt
 "$BIN" new >/dev/null 2>&1
 assert_eq "new commits a wip" "$(git log -1 --format=%s)" "wip"
 assert_eq "new leaves the tree clean" "$(git status --porcelain)" ""
-assert_eq "new marks the wip" "$(git rev-parse --verify --quiet refs/gg/wip)" "$(git rev-parse HEAD)"
+assert_eq "new marks the wip" "$(wipsha)" "$(git rev-parse HEAD)"
+assert_eq "new leaves no shared marker" "$(git rev-parse --verify --quiet refs/gg/wip || echo gone)" "gone"
 echo edit >> f.txt
 "$BIN" br tb >/dev/null 2>&1
 assert_eq "a rewinding verb folds the edit" "$(git rev-list --count HEAD)" "2"
 assert_eq "the fold leaves the tree clean" "$(git status --porcelain)" ""
-assert_eq "the fold keeps the wip marker" "$(git rev-parse --verify --quiet refs/gg/wip)" "$(git rev-parse HEAD)"
+assert_eq "the fold keeps the wip marker" "$(wipsha)" "$(git rev-parse HEAD)"
 echo edit2 >> f.txt
 "$BIN" c -m "real" >/dev/null 2>&1
 assert_eq "c finalizes the wip" "$(git log -1 --format=%s)" "real"
-assert_eq "finalize drops the marker" "$(git rev-parse --verify --quiet refs/gg/wip || echo gone)" "gone"
+assert_eq "finalize drops the marker" "$(wipsha)" "gone"
 assert_eq "finalize keeps one commit" "$(git rev-list --count HEAD)" "2"
 assert_contains "finalize keeps the edits" "$(cat f.txt)" "edit2"
 
 "$BIN" new -m "wip two" >/dev/null 2>&1
 if "$BIN" c >/dev/null 2>&1; then no "c without a message refuses in wip mode"; else ok "c without a message refuses in wip mode"; fi
-assert_eq "the refused c keeps the marker" "$(git rev-parse --verify --quiet refs/gg/wip)" "$(git rev-parse HEAD)"
+assert_eq "the refused c keeps the marker" "$(wipsha)" "$(git rev-parse HEAD)"
 echo late >> f.txt
 "$BIN" uncommit >/dev/null 2>&1
 assert_eq "uncommit takes the wip back" "$(git status --porcelain | tr -d ' ')" "Mf.txt"
-assert_eq "uncommit drops the marker" "$(git rev-parse --verify --quiet refs/gg/wip || echo gone)" "gone"
+assert_eq "uncommit drops the marker" "$(wipsha)" "gone"
 assert_eq "uncommit keeps the committed work" "$(git log -1 --format=%s)" "real"
 
 echo "wip dash badge"
@@ -479,8 +483,72 @@ out=$("$BIN" new 2>&1)
 assert_lacks "a fresh wip is not published" "$out" "already on"
 git push -q origin tb >/dev/null 2>&1
 out=$("$BIN" new 2>&1)
-assert_contains "new warns when the wip is already pushed" "$out" "already on"
+rc=$?
+assert_eq "new refuses a pushed wip" "$rc" "1"
+assert_contains "new names the pushed upstream" "$out" "already on"
+echo later >> f.txt
+pushed=$(git rev-parse HEAD)
+"$BIN" new --force >/dev/null 2>&1
+if git merge-base --is-ancestor "$pushed" HEAD; then no "new --force rewrites the pushed wip"; else ok "new --force rewrites the pushed wip"; fi
 "$BIN" uncommit >/dev/null 2>&1
+
+echo "new refuses what it cannot keep safe"
+R=$(newrepo)
+cd "$R" || exit 1
+echo hi > f.txt
+if "$BIN" new --help >/dev/null 2>&1; then no "new refuses an unknown flag"; else ok "new refuses an unknown flag"; fi
+assert_eq "the refused flag committed nothing" "$(git rev-list --count HEAD)" "1"
+assert_eq "the refused flag kept the tree" "$(git status --porcelain | tr -d ' ')" "??f.txt"
+if "$BIN" new -m >/dev/null 2>&1; then no "new refuses a bare -m"; else ok "new refuses a bare -m"; fi
+mkdir -p .git/rebase-merge
+out=$("$BIN" new 2>&1)
+rc=$?
+assert_eq "new refuses during a rebase" "$rc" "1"
+assert_contains "new names the rebase" "$out" "rebase"
+rmdir .git/rebase-merge
+
+echo hi > f.txt
+git add . >/dev/null 2>&1
+git commit -q -m base
+side="$R.side"
+git worktree add -q "$side" -b side >/dev/null 2>&1
+(cd "$side" && echo side > f.txt && git commit -qam side)
+echo main > f.txt
+git commit -qam main
+git merge side >/dev/null 2>&1
+out=$("$BIN" new 2>&1)
+rc=$?
+assert_eq "new refuses an unmerged tree" "$rc" "1"
+assert_contains "new names the merge" "$out" "merge"
+if [ -f .git/MERGE_HEAD ]; then ok "the merge stays open"; else no "the merge stays open"; fi
+assert_contains "the file keeps the markers" "$(cat f.txt)" "<<<<<<<"
+rm -f .git/MERGE_HEAD
+out=$("$BIN" new 2>&1)
+rc=$?
+assert_eq "new refuses the unmerged entries" "$rc" "1"
+assert_contains "new names the conflicts" "$out" "conflicts"
+git reset --hard >/dev/null 2>&1
+git worktree remove --force "$side" >/dev/null 2>&1
+
+echo "a wip marker per worktree"
+R=$(newrepo)
+cd "$R" || exit 1
+echo a > a.txt
+git add . >/dev/null 2>&1
+git commit -q -m a
+for w in w1 w2; do git worktree add -q "$R.$w" -b "$w" >/dev/null 2>&1; done
+(cd "$R.w1" && echo one >> a.txt && "$BIN" new -m w1 >/dev/null 2>&1)
+w1head=$(git -C "$R.w1" rev-parse HEAD)
+(cd "$R.w2" && echo two >> a.txt && "$BIN" new -m w2 >/dev/null 2>&1)
+w1mark=$(cat "$(git -C "$R.w1" rev-parse --absolute-git-dir)/gg/wip" 2>/dev/null)
+assert_eq "the second worktree keeps the first marker" "$w1mark" "$w1head"
+w1first=$(git -C "$R.w1" rev-parse HEAD)
+(cd "$R.w1" && echo more >> a.txt && "$BIN" new >/dev/null 2>&1)
+if git -C "$R.w1" merge-base --is-ancestor "$w1first" HEAD; then
+	no "the first worktree folds its own wip"
+else
+	ok "the first worktree folds its own wip"
+fi
 
 echo "worktrees"
 R=$(newrepo)

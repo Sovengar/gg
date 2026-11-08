@@ -34,7 +34,7 @@ revert|rv	fn:revert	undo one commit with a new commit	hint:Takes a changeId, -m 
 
 # --- Register work ---
 commit|c|ca	fn:commit	save the changes you name, or all of them	hint:Add a message with -m. A changeId names one change.
-new	fn:new	save the changes, absorb more until you commit	hint:Add a message with -m.
+new	fn:new	save the changes, absorb more until you commit	hint:Add -m <msg>. --force rewrites a pushed wip.
 empty	commit --allow-empty	record an empty commit
 copy|cp	fn:copy	copy a commit onto a branch	hint:Takes a changeId, then a branch
 absorb	absorb	fold changes into the right commit
@@ -50,7 +50,7 @@ edit	fn:edit	stop a rebase at a commit	hint:Takes a changeId
 # --- Branching ---
 branch switch	fn:branches	change branch	hint:Takes a branch	display:branch (br)	displayonly
 cbr	switch -c	branch new and switch	hint:Takes a branch. branch new <name> works too	display:branch -c (cbr)
-dbr|delete-branch	fn:deleteBranch	delete a branch, tip kept in a ref	hint:Safe: unmerged commits stay. Takes a branch or a changeId	display:branch -d (dbr)
+dbr	fn:deleteBranch	delete a branch, tip kept in a ref	hint:Safe: unmerged commits stay. Takes a branch or a changeId	display:branch -d (dbr)
 Dbr	fn:deleteBranchForce	delete a branch even when unmerged	hint:Force. Drops unmerged commits, keeps the tip ref	display:branch -D (Dbr)	variant
 mg	merge	merge a branch into this one	hint:Takes a branch
 wt	fn:wt	parallel branches, one worktree each	hint:Takes new|ls|rm

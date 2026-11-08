@@ -133,6 +133,17 @@ fold your changes into it first (`gg br <name>`, `gg update`, `gg sync`, `gg ame
 `gg c -m "msg"` or take it back with `gg uncommit`. `gg c` with no message
 refuses while in wip mode. There is no stash.
 
+`gg new` refuses when it cannot keep the tree safe. It stops while git owns the
+tree (`MERGE_HEAD`, `rebase-merge`, `CHERRY_PICK_HEAD`, `REVERT_HEAD`), because a
+commit there would swallow the operation. It stops on an unmerged path, because
+`git add -A` would commit the conflict markers. It stops when the wip commit is
+already on the upstream, because folding rewrites a published commit; `--force`
+takes that risk on purpose. Any argument other than `-m` and `--force` is an
+error: `gg new` commits the whole tree, so a typo must not become a commit.
+
+The wip marker is a file under the worktree's own git dir, so two worktrees keep
+two wips and neither one drops the other's marker.
+
 Work that must not share a checkout goes to its own worktree:
 
 ```
