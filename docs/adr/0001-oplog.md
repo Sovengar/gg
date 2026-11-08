@@ -42,12 +42,15 @@ An entry is built with `git commit-tree`:
 
 - P1 is the previous entry.
 - P2 is HEAD at snapshot time, when HEAD exists and differs from P1.
-- The message is the verb name.
+- The message is the verb name, a blank line, then the trailer `gg-refs: <blob-sha>`.
 - The tree is the worktree snapshot.
+- The refs blob records `git for-each-ref` over `refs/heads`, `refs/tags` and `refs/gg`, excluding `refs/gg/oplog/`, plus HEAD's symbolic target.
 
 The committer identity is the marker `gg oplog <gg-oplog@localhost>`. `p1` and `p2` use this marker to tell an entry from a normal commit.
 
 The worktree snapshot uses a temporary index at `<git-dir>/gg-tmp-index-<pid>-<counter>`. The name is unique per process and run, so two `gg` processes in one repository cannot clobber each other. The steps are `read-tree HEAD`, `add -A`, `write-tree`. The temporary index is removed after use. The real index and HEAD are not touched while recording. When the repository has no HEAD yet, the base is the empty tree from `git mktree`.
+
+`Record(verb)` captures the worktree tree and the refs snapshot, writes the refs text with `git hash-object -w --stdin`, and stores the blob sha in the `gg-refs:` trailer. The mutating set now also includes the verbs that move refs: `sw`, `cbr`, `dbr`, `delete-branch`, `mg`, `wt`, `re`, `raw`. `branch` is not in the set; `Branches` calls `oplog.Record("branch")` only when it creates or switches to a branch.
 
 `Record(verb)` runs before every verb in the mutating set. The set is gated by `verbs.IsMutating`. The call sites are `execArgv` and `execFunc` in `main.go`, and also `execTool`. `Record` returns early when the current directory is not inside a repository.
 
@@ -64,14 +67,14 @@ The chain grows by one commit per recorded verb. Entries are ordinary commit obj
 1. Snapshot the current state. Do this only when it differs from `cur`. This records an extra `undo` entry when the worktree is dirty.
 2. Find the Nth ancestor of `cur`.
 3. Refuse when the current branch has an upstream and the target P2 is not an ancestor of the upstream tip. The message names the branch and asks for `--force` or `-f`, which bypasses the guard. A target without P2 is never guarded.
-4. Restore it with `git reset --hard <P2>`, then `git read-tree -u --reset <entry>`, then `git reset --quiet` so restored files are unstaged and new files are untracked.
+4. Restore it with `git reset --hard <P2>`, then `git read-tree -u --reset <entry>`. Apply the entry's refs: read the blob, `git update-ref` every captured ref whose value differs, create missing refs, and delete now-present refs in the captured namespaces that are absent from the snapshot. Then restore HEAD's symbolic target and run `git reset --quiet` so restored files are unstaged and new files are untracked. Old entries without the trailer skip the refs step silently.
 5. Point `cur` at the restored entry and `redo` at the old tip.
 
 When the worktree already matches `cur`, the newest entry is not a step. `undo N` then moves N entries back from `cur`. The relative age uses compact units: `5m`, `2h`, `10d`, `3w`.
 
 `gg redo` reads the entry stored in `refs/gg/oplog/redo`. When the worktree or HEAD differs from that target, it records the current state first, then restores the target and points `cur` at it. A following undo therefore returns edits made after the undo. Redo then clears the ref. The ref holds one sha, so redo moves forward one step, not a stack of steps. A new `Record` clears the ref as well.
 
-`trim()` keeps the log bounded. When the chain grows past 100 entries, it rebuilds the newest 100. Each rebuilt entry keeps the same tree, P2, message and original committer date. `tip` and `cur` move to the rebuilt chain. If the redo ref is set and is not an ancestor of the new `cur`, `trim` clears it. `undo` refuses a count larger than the chain and exits 1.
+`trim()` keeps the log bounded. When the chain grows past 100 entries, it rebuilds the newest 100. Each rebuilt entry keeps the same tree, P2, full multi-line message (including the `gg-refs:` trailer) and original committer date. `tip` and `cur` move to the rebuilt chain. If the redo ref is set and is not an ancestor of the new `cur`, `trim` clears it. `undo` refuses a count larger than the chain and exits 1.
 
 The snapshot includes untracked files. Therefore `gg discard` and every other mutating verb is revertible with `gg undo`. No stash and no extra commit are needed for that.
 
@@ -79,7 +82,7 @@ The snapshot includes untracked files. Therefore `gg discard` and every other mu
 
 ### Good
 
-- Undo now covers the full worktree: tracked edits, new untracked files and deletions.
+- Undo now covers the full worktree, branches, tags and `refs/gg/*`, not just HEAD.
 - `gg discard` is revertible. The user does not need to commit or stash before a risky verb.
 - The history is inspectable with standard git commands, for example `git log refs/gg/oplog/tip`.
 - `gg oplog` is read-only. It does not add an entry.
@@ -94,8 +97,9 @@ The snapshot includes untracked files. Therefore `gg discard` and every other mu
 
 ### Bad
 
-- Every mutating verb runs a full `add -A` of the worktree. The cost grows with the number of files, not with the number of changes.
-- Each entry adds one tree object. Each changed file adds a new blob. Storage grows with the edit history of the worktree.
+- Every mutating verb runs a full `add -A` of the worktree plus one extra `for-each-ref` and one refs blob. The cost grows with the number of files, not with the number of changes.
+- Each entry adds one tree object and one small refs blob. Each changed file adds a new blob. Storage grows with the edit history of the worktree.
+- Undo rewinds refs from other tools inside `refs/heads`, `refs/tags` and `refs/gg`; `refs/remotes/*` is never touched.
 - `gg oplog` shows only the reachable chain. Entries dropped by `trim` are not listed.
 - Pruning happens only through `trim` and `git gc`. Dropped entries stay in `.git` until git collects them.
 - After the log reaches 100 entries, every `Record` rebuilds the whole chain: 100 `commit-tree` calls per mutating verb.
@@ -113,6 +117,7 @@ The snapshot includes untracked files. Therefore `gg discard` and every other mu
 6. **LOW — the temporary index path is fixed. Fixed.** `snapshotTree` names the index `<git-dir>/gg-tmp-index-<pid>-<counter>`, unique per process and run, and still removes it in a `defer`.
 7. **LOW — an empty log is an error. Fixed.** `gg oplog` with no entries prints `no operations yet` on stdout and exits 0.
 8. **LOW — `trim` does not move the redo ref. Fixed.** After rebuilding the chain, `trim` clears the redo ref when it is set and is not an ancestor of the new `cur`.
+9. **LOW — refs outside the captured namespaces are not covered.** Known gap: refs outside `refs/heads`, `refs/tags` and `refs/gg` are not snapshotted or restored.
 
 ### Alternatives considered
 

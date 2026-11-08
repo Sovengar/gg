@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"gg/internal/dash"
+	"gg/internal/diffview"
 	"gg/internal/hist"
 	"gg/internal/oplog"
 	"gg/internal/ops"
@@ -111,11 +112,13 @@ var mutating = map[string]bool{
 	"commit": true, "c": true, "ca": true, "amend": true, "uncommit": true,
 	"split": true, "squash": true, "absorb": true, "empty": true,
 	"move": true, "publish": true, "sync": true, "update": true,
-	"abandon": true, "copy": true, "cp": true, "push": true, "pu": true, "up": true,
+	"abandon": true, "copy": true, "cp": true, "push": true, "p": true, "up": true,
 	"edit": true, "continue": true, "hooks": true, "abort": true,
-	"new": true, "discard": true, "rs": true, "clear": true, "cl": true,
+	"new": true, "discard": true, "clear": true, "cl": true,
 	"revert": true, "rv": true,
 	"reword": true, "rename": true, "describe": true, "desc": true,
+	"sw": true, "cbr": true, "dbr": true, "delete-branch": true,
+	"mg": true, "wt": true, "re": true, "raw": true,
 }
 
 var table = parse(registry)

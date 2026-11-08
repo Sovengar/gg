@@ -277,3 +277,60 @@ func mustRef(t *testing.T, ref string) string {
 	}
 	return sha
 }
+
+func TestRecordWritesRefsTrailer(t *testing.T) {
+	dir := newRepo(t)
+	inDir(t, dir)
+
+	Record("commit")
+	cur := mustRef(t, curRef)
+	message, err := gitxOutput("log", "-1", "--format=%B", cur)
+	if err != nil {
+		t.Fatal(err)
+	}
+	subject, body, found := strings.Cut(message, "\n\n")
+	if !found || subject != "commit" {
+		t.Fatalf("message = %q, want subject commit and a trailer body", message)
+	}
+	blob, ok := strings.CutPrefix(strings.TrimSpace(body), "gg-refs: ")
+	if !ok || strings.Contains(blob, "\n") {
+		t.Fatalf("trailer body = %q, want one gg-refs line", body)
+	}
+	text, err := gitxOutput("cat-file", "blob", strings.TrimSpace(blob))
+	if err != nil {
+		t.Fatal(err)
+	}
+	head := git(t, dir, "rev-parse", "HEAD")
+	if !strings.Contains(text, "refs/heads/main "+head) {
+		t.Errorf("refs blob = %q, want refs/heads/main %s", text, head)
+	}
+	if strings.Contains(text, "refs/gg/oplog/") {
+		t.Errorf("refs blob contains the oplog refs: %q", text)
+	}
+}
+
+func TestRestoreRecreatesDeletedBranch(t *testing.T) {
+	dir := newRepo(t)
+	inDir(t, dir)
+
+	git(t, dir, "branch", "side")
+	sha := git(t, dir, "rev-parse", "refs/heads/side")
+	Record("dbr")
+	git(t, dir, "branch", "-D", "side")
+
+	if rc := Undo(1); rc != 0 {
+		t.Fatalf("Undo(1) = %d", rc)
+	}
+	if got := git(t, dir, "rev-parse", "refs/heads/side"); got != sha {
+		t.Errorf("refs/heads/side = %s after undo, want %s", got, sha)
+	}
+}
+
+func gitxOutput(args ...string) (string, error) {
+	cmd := exec.Command("git", args...)
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
+}

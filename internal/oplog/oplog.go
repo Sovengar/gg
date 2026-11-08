@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -38,9 +39,14 @@ func Record(verb string) {
 		ui.Errf("gg: oplog: %v", err)
 		return
 	}
+	message, err := currentMessage(verb)
+	if err != nil {
+		ui.Errf("gg: oplog: %v", err)
+		return
+	}
 	cur, _ := getRef(curRef)
 	head, _ := gitx.Head()
-	sha, err := commitEntry(tree, cur, head, verb, "")
+	sha, err := commitEntry(tree, cur, head, message, "")
 	if err != nil {
 		ui.Errf("gg: oplog: %v", err)
 		return
@@ -100,7 +106,7 @@ func Undo(n int, force ...bool) int {
 	head, hasHead := gitx.Head()
 	curTree, _ := entryTree(cur)
 	curHead, hasCurHead := p2(cur)
-	same := tree == curTree && hasHead == hasCurHead && (!hasHead || head == curHead)
+	same := tree == curTree && hasHead == hasCurHead && (!hasHead || head == curHead) && refsMatch(cur)
 
 	steps := len(chain(cur))
 	if same {
@@ -112,7 +118,12 @@ func Undo(n int, force ...bool) int {
 	}
 
 	if !same {
-		sha, err := commitEntry(tree, cur, head, "undo", "")
+		message, err := currentMessage("undo")
+		if err != nil {
+			ui.Errf("gg: oplog: %v", err)
+			return 1
+		}
+		sha, err := commitEntry(tree, cur, head, message, "")
 		if err != nil {
 			ui.Errf("gg: oplog: %v", err)
 			return 1
@@ -171,7 +182,7 @@ func Redo() int {
 	head, hasHead := gitx.Head()
 	targetTree, _ := entryTree(target)
 	targetHead, hasTargetHead := p2(target)
-	same := tree == targetTree && hasHead == hasTargetHead && (!hasHead || head == targetHead)
+	same := tree == targetTree && hasHead == hasTargetHead && (!hasHead || head == targetHead) && refsMatch(target)
 
 	restoreSha := target
 	from := ""
@@ -179,14 +190,19 @@ func Redo() int {
 		// Insert the current state before the target, then rebuild the target
 		// state on top of it. The next undo lands on the recorded edit.
 		prev, _ := getRef(curRef)
-		edit, err := commitEntry(tree, prev, head, "redo", "")
+		message, err := currentMessage("redo")
 		if err != nil {
 			ui.Errf("gg: oplog: %v", err)
 			return 1
 		}
-		verb, _ := gitx.Output("log", "-1", "--format=%s", target)
+		edit, err := commitEntry(tree, prev, head, message, "")
+		if err != nil {
+			ui.Errf("gg: oplog: %v", err)
+			return 1
+		}
+		message, _ = gitx.Output("log", "-1", "--format=%B", target)
 		date, _ := gitx.Output("log", "-1", "--format=%ct", target)
-		restoreSha, err = commitEntry(targetTree, edit, targetHead, verb, date)
+		restoreSha, err = commitEntry(targetTree, edit, targetHead, message, date)
 		if err != nil {
 			ui.Errf("gg: oplog: %v", err)
 			return 1
@@ -222,6 +238,9 @@ func restore(sha, from string) int {
 	if rc := gitx.Run("read-tree", "-u", "--reset", sha); rc != 0 {
 		return rc
 	}
+	if rc := applyRefs(sha); rc != 0 {
+		return rc
+	}
 	if _, ok := gitx.Head(); ok {
 		if rc := gitx.Run("reset", "--quiet"); rc != 0 {
 			return rc
@@ -231,6 +250,185 @@ func restore(sha, from string) int {
 	}
 	setRef(curRef, sha)
 	return 0
+}
+
+// currentMessage captures the refs and builds the entry message for verb.
+func currentMessage(verb string) (string, error) {
+	blob, err := snapshotRefs()
+	if err != nil {
+		return "", err
+	}
+	return verb + "\n\ngg-refs: " + blob, nil
+}
+
+// snapshotRefText renders the managed refs and HEAD's symbolic target.
+func snapshotRefText() (string, error) {
+	lines, err := refLines()
+	if err != nil {
+		return "", err
+	}
+	if head, err := gitx.Output("symbolic-ref", "--quiet", "HEAD"); err == nil && head != "" {
+		lines = append(lines, "@head "+head)
+	} else if head, ok := gitx.Head(); ok {
+		lines = append(lines, "@detached "+head)
+	}
+	sort.Strings(lines)
+	return strings.Join(lines, "\n"), nil
+}
+
+// snapshotRefs writes the managed refs and HEAD's symbolic target to a blob.
+func snapshotRefs() (string, error) {
+	text, err := snapshotRefText()
+	if err != nil {
+		return "", err
+	}
+	return hashObject(text)
+}
+
+// refsMatch reports whether the current refs equal the entry's snapshot. Old
+// entries without a trailer are treated as matching.
+func refsMatch(entry string) bool {
+	blob, ok := refsTrailer(entry)
+	if !ok {
+		return true
+	}
+	want, err := gitx.Output("cat-file", "blob", blob)
+	if err != nil {
+		return false
+	}
+	have, err := snapshotRefText()
+	if err != nil {
+		return false
+	}
+	return want == have
+}
+
+// refLines lists the managed refs, excluding the oplog's own refs.
+func refLines() ([]string, error) {
+	lines, err := gitx.OutputAll("for-each-ref",
+		"--format=%(refname) %(objectname)",
+		"refs/heads", "refs/tags", "refs/gg")
+	if err != nil {
+		return nil, err
+	}
+	out := lines[:0]
+	for _, line := range lines {
+		if strings.HasPrefix(line, "refs/gg/oplog/") {
+			continue
+		}
+		out = append(out, line)
+	}
+	return out, nil
+}
+
+func hashObject(text string) (string, error) {
+	cmd := exec.Command("git", "hash-object", "-w", "--stdin")
+	cmd.Stdin = strings.NewReader(text)
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+// refsTrailer returns the refs blob sha stored in an entry, when present.
+func refsTrailer(sha string) (string, bool) {
+	message, err := gitx.Output("log", "-1", "--format=%B", sha)
+	if err != nil {
+		return "", false
+	}
+	for _, line := range strings.Split(message, "\n") {
+		if blob, ok := strings.CutPrefix(strings.TrimSpace(line), "gg-refs: "); ok {
+			return strings.TrimSpace(blob), true
+		}
+	}
+	return "", false
+}
+
+// applyRefs restores the refs captured by an entry. A missing trailer is an
+// old entry, so refs are left alone.
+func applyRefs(entry string) int {
+	blob, ok := refsTrailer(entry)
+	if !ok {
+		return 0
+	}
+	text, err := gitx.Output("cat-file", "blob", blob)
+	if err != nil {
+		ui.Errf("gg: oplog: refs snapshot: %v", err)
+		return 1
+	}
+	wanted := make(map[string]string)
+	head, detached := "", ""
+	for _, line := range strings.Split(text, "\n") {
+		line = strings.TrimSpace(line)
+		switch {
+		case line == "":
+			continue
+		case strings.HasPrefix(line, "@head "):
+			head = strings.TrimSpace(strings.TrimPrefix(line, "@head "))
+			continue
+		case strings.HasPrefix(line, "@detached "):
+			detached = strings.TrimSpace(strings.TrimPrefix(line, "@detached "))
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 2 || !managedRef(fields[0]) {
+			continue
+		}
+		wanted[fields[0]] = fields[1]
+	}
+
+	current := make(map[string]string)
+	lines, err := refLines()
+	if err != nil {
+		ui.Errf("gg: oplog: refs snapshot: %v", err)
+		return 1
+	}
+	for _, line := range lines {
+		fields := strings.Fields(line)
+		if len(fields) >= 2 && managedRef(fields[0]) {
+			current[fields[0]] = fields[1]
+		}
+	}
+	for ref, sha := range wanted {
+		if cur, ok := current[ref]; !ok || cur != sha {
+			if _, err := gitx.Output("update-ref", ref, sha); err != nil {
+				ui.Errf("gg: oplog: restore %s: %v", ref, err)
+				return 1
+			}
+		}
+	}
+	for ref := range current {
+		if _, ok := wanted[ref]; ok {
+			continue
+		}
+		if _, err := gitx.Output("update-ref", "-d", ref); err != nil {
+			ui.Errf("gg: oplog: delete %s: %v", ref, err)
+			return 1
+		}
+	}
+	if detached != "" {
+		if _, err := gitx.Output("update-ref", "--no-deref", "HEAD", detached); err != nil {
+			ui.Errf("gg: oplog: restore HEAD: %v", err)
+			return 1
+		}
+	} else if head != "" {
+		if _, err := gitx.Output("symbolic-ref", "HEAD", head); err != nil {
+			ui.Errf("gg: oplog: restore HEAD: %v", err)
+			return 1
+		}
+	}
+	return 0
+}
+
+// managedRef reports whether undo owns the ref namespace.
+func managedRef(ref string) bool {
+	if strings.HasPrefix(ref, "refs/gg/oplog/") {
+		return false
+	}
+	return strings.HasPrefix(ref, "refs/heads/") ||
+		strings.HasPrefix(ref, "refs/tags/") ||
+		strings.HasPrefix(ref, "refs/gg/")
 }
 
 // snapshotTree writes the tracked and untracked worktree to a tree object
@@ -277,7 +475,7 @@ func emptyTree() (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
-func commitEntry(tree, prev, head, verb, date string) (string, error) {
+func commitEntry(tree, prev, head, message, date string) (string, error) {
 	args := []string{"commit-tree", tree}
 	if prev != "" {
 		args = append(args, "-p", prev)
@@ -285,7 +483,7 @@ func commitEntry(tree, prev, head, verb, date string) (string, error) {
 	if head != "" && head != prev {
 		args = append(args, "-p", head)
 	}
-	args = append(args, "-m", verb)
+	args = append(args, "-m", message)
 	env := []string{
 		"GIT_COMMITTER_NAME=" + markerName,
 		"GIT_COMMITTER_EMAIL=" + markerEmail,
@@ -409,9 +607,9 @@ func trim() {
 			return
 		}
 		head, _ := p2(old)
-		verb, _ := gitx.Output("log", "-1", "--format=%s", old)
+		message, _ := gitx.Output("log", "-1", "--format=%B", old)
 		date, _ := gitx.Output("log", "-1", "--format=%ct", old)
-		sha, err := commitEntry(tree, prev, head, verb, date)
+		sha, err := commitEntry(tree, prev, head, message, date)
 		if err != nil {
 			return
 		}

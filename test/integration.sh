@@ -53,11 +53,20 @@ build
 
 echo "help and registry"
 out=$("$BIN" help)
-assert_contains "help lists status" "$out" "status (st, sta, stf)"
+assert_contains "help lists status" "$out" "status"
+assert_contains "help lists the aliases" "$out" "aka    st · sta · stf · br"
 assert_contains "help lists raw" "$out" "raw"
-assert_contains "help -all shows git command" "$("$BIN" help -all)" "git status --short"
+assert_contains "help -all shows git command" "$("$BIN" help -all)" "git show"
 case "$out" in
-*"git status --short"*) no "default help hides git command" ;;
+*"Overview of the workspace"*) no "default help hides descriptions" ;;
+*) ok "default help hides descriptions" ;;
+esac
+case "$out" in
+*"Rollback work"*) ok "default help keeps the categories" ;;
+*) no "default help keeps the categories" ;;
+esac
+case "$out" in
+*"git show"*) no "default help hides git command" ;;
 *) ok "default help hides git command" ;;
 esac
 assert_contains "verbs names" "$("$BIN" verbs)" "log"
@@ -66,9 +75,10 @@ echo "read-only verbs"
 R=$(newrepo)
 cd "$R" || exit 1
 echo hi > f.txt
-assert_contains "st shows untracked" "$("$BIN" st)" "?? f.txt"
-assert_eq "print mode" "$("$BIN" -p st -u)" "git status --short -u"
-assert_eq "dry is print" "$("$BIN" --dry st)" "git status --short"
+assert_contains "st shows untracked" "$("$BIN" st)" "A f.txt"
+assert_contains "st draws the tree" "$("$BIN" st)" "[uncommitted]"
+assert_eq "print mode" "$("$BIN" -p st -u)" "gg st -u"
+assert_eq "dry is print" "$("$BIN" --dry st)" "gg st"
 assert_contains "raw passthrough" "$("$BIN" raw rev-parse --short HEAD)" "$(git rev-parse --short HEAD)"
 assert_eq "unknown verb goes to git" "$("$BIN" -p blame -L 1,1 f.txt)" "git blame -L 1,1 f.txt"
 assert_contains "log renders" "$("$BIN" log 1)" "init"
@@ -206,7 +216,7 @@ assert_contains "undo guard names the branch" "$out" "tb"
 assert_contains "undo guard asks for force" "$out" "--force"
 assert_eq "the refused undo leaves HEAD alone" "$(git log -1 --format=%s)" "published"
 "$BIN" undo --force >/dev/null 2>&1
-assert_eq "undo --force bypasses the guard" "$(git log -1 --format=%s)" "two"
+assert_eq "undo --force bypasses the guard" "$(git log -1 --format=%s)" "one"
 
 echo "uncommit"
 R=$(newrepo)
@@ -310,13 +320,14 @@ before=$(git rev-list --count HEAD)
 mid=$("$BIN" log 2 | tail -1 | awk '{print $2}')
 "$BIN" abandon "$mid" >/dev/null 2>&1
 assert_eq "abandon drops one commit" "$(git rev-list --count HEAD)" "$((before - 1))"
-assert_contains "help groups by category" "$("$BIN" help)" "Edit saved work:"
-assert_contains "help shows Register work" "$("$BIN" help)" "Register work:"
-assert_contains "help shows Branching" "$("$BIN" help)" "Branching:"
+assert_contains "help groups by category" "$("$BIN" help)" "Edit saved work"
+assert_contains "help shows Register work" "$("$BIN" help)" "Register work"
+assert_contains "help shows Branching" "$("$BIN" help)" "Branching"
+assert_contains "help -all prints the categories with a colon" "$("$BIN" help -all)" "Register work:"
 assert_lacks "help drops the old branching category" "$("$BIN" help)" "Branching and Committing"
 assert_lacks "help drops Others" "$("$BIN" help)" "Others:"
 assert_contains "help shows reword" "$("$BIN" help)" "reword"
-assert_contains "help shows the git command with -all" "$("$BIN" help -all)" "git status --short"
+assert_contains "help shows the git command with -all" "$("$BIN" help -all)" "git show"
 assert_contains "amend prints" "$("$BIN" -p amend)" "gg amend"
 assert_contains "reword prints" "$("$BIN" -p reword ab)" "gg reword ab"
 assert_contains "split prints" "$("$BIN" -p split ab -- f.txt)" "gg split ab -- f.txt"
@@ -328,7 +339,7 @@ assert_contains "br alias" "$("$BIN" -p br trunk)" "gg br trunk"
 assert_contains "branch verb" "$("$BIN" -p branch)" "gg branch"
 assert_contains "log alias renders" "$("$BIN" -p log 3)" "gg log 3"
 assert_eq "dw is gone" "$("$BIN" -p dw)" "git dw"
-assert_contains "diff takes -w" "$("$BIN" -p diff -w)" "git diff -w"
+assert_contains "diff takes -w" "$("$BIN" -p diff -w)" "gg diff -w"
 
 echo "external tools"
 R=$(newrepo)
@@ -353,7 +364,10 @@ assert_eq "push refuses when behind" "$rc" "1"
 assert_contains "push explains drift" "$out" "commit(s) you don't have"
 assert_contains "pushed commits carry a green ball" "$(cd "$B" && GG_COLOR=always "$BIN" log 1)" "92m●"
 assert_contains "print mode for fn verbs" "$("$BIN" -p push)" "gg push"
-assert_contains "pu is push" "$("$BIN" -p pu)" "gg pu"
+assert_contains "p is push" "$("$BIN" -p p)" "gg p"
+assert_eq "pu is gone" "$("$BIN" -p pu)" "git pu"
+assert_eq "rs is gone" "$("$BIN" -p rs)" "git rs"
+assert_eq "fetch prunes every remote" "$("$BIN" -p fetch)" "git fetch --all --prune"
 assert_contains "up is update" "$("$BIN" -p up)" "gg up"
 if "$BIN" -p sync >/dev/null 2>&1; then ok "sync prints without args"; else no "sync prints without args"; fi
 if "$BIN" sync >/dev/null 2>&1; then no "sync requires a branch"; else ok "sync requires a branch"; fi
@@ -364,9 +378,12 @@ assert_lacks "help has no Stash section" "$out" "Stash"
 assert_lacks "help has no stasha" "$out" "stasha"
 assert_lacks "help has no stashs" "$out" "stashs"
 assert_lacks "help has no wip verb" "$out" "wip  "
-assert_contains "help lists new" "$out" "absorb more until you commit"
-assert_contains "help lists wt" "$out" "parallel branches, one worktree each"
-assert_contains "help lists discard" "$out" "discard (rs)"
+assert_contains "help lists new" "$out" "new"
+assert_contains "help lists wt" "$out" "wt"
+assert_contains "help --all describes new" "$("$BIN" help --all)" "absorb more until you commit"
+assert_contains "help --all describes wt" "$("$BIN" help --all)" "parallel branches, one worktree each"
+assert_contains "help lists discard" "$out" "discard"
+assert_contains "help lists the discard alias" "$out" "aka    cl · rv"
 assert_contains "help lists clear" "$out" "clear"
 assert_lacks "help has no cl verb" "$out" "wipe tree and index"
 assert_lacks "help has no cl-wd verb" "$out" "wipe the working tree"
@@ -496,11 +513,11 @@ git add . >/dev/null 2>&1
 git commit -q -m files
 echo edit >> a.txt
 echo fresh > c.txt
-h=$(NO_COLOR=1 "$BIN" dash | awk '$3=="a.txt"{print $1}')
+h=$(NO_COLOR=1 "$BIN" dash | awk '$4=="a.txt"{print $2}')
 "$BIN" c -m "only a" "$h" >/dev/null 2>&1
 assert_eq "commit takes one changeId" "$(git show --name-only --format= HEAD)" "a.txt"
 assert_contains "the other path stays dirty" "$(git status --porcelain)" "c.txt"
-h=$(NO_COLOR=1 "$BIN" dash | awk '$3=="c.txt"{print $1}')
+h=$(NO_COLOR=1 "$BIN" dash | awk '$4=="c.txt"{print $2}')
 "$BIN" c -m "add c" "$h" >/dev/null 2>&1
 assert_eq "commit takes an untracked changeId" "$(git show --name-only --format= HEAD)" "c.txt"
 assert_eq "nothing dirty is left" "$(git status --porcelain)" ""
@@ -537,8 +554,9 @@ echo x >> a.txt
 "$BIN" new >/dev/null 2>&1
 if "$BIN" revert HEAD >/dev/null 2>&1; then no "revert refuses a wip"; else ok "revert refuses a wip"; fi
 
-assert_contains "help lists clear as cl" "$("$BIN" help)" "clear (cl)"
-assert_contains "help lists revert" "$("$BIN" help)" "revert (rv)"
+out=$("$BIN" help)
+assert_contains "help lists clear" "$out" "clear"
+assert_contains "help lists revert" "$out" "revert"
 
 echo "old surface is gone"
 out=$("$BIN" help)
@@ -634,6 +652,43 @@ git reset -q --hard HEAD~1
 git cherry-pick -q "$sha2" >/dev/null 2>&1
 cid3=$(NO_COLOR=1 "$BIN" log 1 | awk '{print $2}')
 assert_eq "the changeId survived a cherry-pick" "$cid3" "$cid"
+
+echo "oplog restores refs"
+R=$(newrepo)
+cd "$R" || exit 1
+git branch gone
+gone_sha=$(git rev-parse refs/heads/gone)
+"$BIN" dbr gone >/dev/null 2>&1
+assert_eq "dbr removed the branch" "$(git for-each-ref refs/heads/gone --format='%(refname)')" ""
+"$BIN" undo >/dev/null 2>&1
+assert_eq "undo restores a deleted branch at the same sha" "$(git rev-parse refs/heads/gone)" "$gone_sha"
+assert_contains "undo lists the restored branch" "$(git branch --format='%(refname:short)')" "gone"
+assert_eq "undo drops the deletion backup" "$(git for-each-ref refs/gg/deleted/gone --format='%(refname)')" ""
+
+"$BIN" cbr created >/dev/null 2>&1
+assert_eq "cbr created the branch" "$(git rev-parse --abbrev-ref HEAD)" "created"
+"$BIN" undo >/dev/null 2>&1
+assert_eq "undo removes a created branch" "$(git for-each-ref refs/heads/created --format='%(refname)')" ""
+assert_eq "undo returns after removing a created branch" "$(git rev-parse --abbrev-ref HEAD)" "tb"
+
+git tag v1
+tag_sha=$(git rev-parse refs/tags/v1)
+"$BIN" raw tag -d v1 >/dev/null 2>&1
+assert_eq "raw deleted the tag" "$(git for-each-ref refs/tags/v1 --format='%(refname)')" ""
+"$BIN" undo >/dev/null 2>&1
+assert_eq "undo restores a deleted tag" "$(git rev-parse refs/tags/v1)" "$tag_sha"
+
+git branch other
+"$BIN" sw other >/dev/null 2>&1
+assert_eq "sw switched branches" "$(git rev-parse --abbrev-ref HEAD)" "other"
+"$BIN" undo >/dev/null 2>&1
+assert_eq "undo returns to the original branch" "$(git rev-parse --abbrev-ref HEAD)" "tb"
+
+"$BIN" br new added >/dev/null 2>&1
+assert_eq "br new created the branch" "$(git rev-parse --abbrev-ref HEAD)" "added"
+"$BIN" undo >/dev/null 2>&1
+assert_eq "undo removes a branch made by br new" "$(git for-each-ref refs/heads/added --format='%(refname)')" ""
+assert_eq "undo returns after removing a br new branch" "$(git rev-parse --abbrev-ref HEAD)" "tb"
 
 echo
 echo "passed $pass, failed $fail"

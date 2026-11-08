@@ -43,3 +43,61 @@ func TestParseFlags(t *testing.T) {
 		t.Errorf("args = %q, want [st -u]", args)
 	}
 }
+
+func TestWrapItems(t *testing.T) {
+	got := wrapItems([]string{"status (st)", "log", "diff"}, 20)
+	want := []string{"status (st) · log", "diff"}
+	if len(got) != len(want) {
+		t.Fatalf("lines = %q, want %q", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("line %d = %q, want %q", i, got[i], want[i])
+		}
+	}
+
+	// a single item wider than the limit still prints whole
+	got = wrapItems([]string{"reword (rename, describe, desc)", "split"}, 20)
+	if got[0] != "reword (rename, describe, desc)" || got[1] != "split" {
+		t.Errorf("oversized item = %q", got)
+	}
+}
+
+func TestTermWidth(t *testing.T) {
+	t.Setenv("COLUMNS", "120")
+	if n := termWidth(); n != 120 {
+		t.Errorf("width = %d, want 120", n)
+	}
+	t.Setenv("COLUMNS", "junk")
+	if n := termWidth(); n != 80 {
+		t.Errorf("width = %d, want the 80 fallback", n)
+	}
+}
+
+func TestSplitDisplay(t *testing.T) {
+	cases := []struct {
+		display string
+		name    string
+		aliases []string
+	}{
+		{"log", "log", nil},
+		{"status (st, sta, stf)", "status", []string{"st", "sta", "stf"}},
+		{"branch new (cbr)", "branch new", []string{"cbr"}},
+		{"dbr (delete-branch)", "dbr", []string{"delete-branch"}},
+	}
+	for _, c := range cases {
+		name, aliases := splitDisplay(c.display)
+		if name != c.name {
+			t.Errorf("splitDisplay(%q) name = %q, want %q", c.display, name, c.name)
+		}
+		if len(aliases) != len(c.aliases) {
+			t.Errorf("splitDisplay(%q) aliases = %q, want %q", c.display, aliases, c.aliases)
+			continue
+		}
+		for i := range c.aliases {
+			if aliases[i] != c.aliases[i] {
+				t.Errorf("splitDisplay(%q) alias %d = %q, want %q", c.display, i, aliases[i], c.aliases[i])
+			}
+		}
+	}
+}

@@ -298,6 +298,10 @@ func execFunc(entry verbs.Entry, typed string, rest []string, m mode) int {
 		fmt.Println(strings.TrimSpace("gg " + typed + " " + quote(rest)))
 		return 0
 	}
+	// wt ls only reads, so it records no entry and prints no footer.
+	if entry.Name == "wt" && len(rest) > 0 && (rest[0] == "ls" || rest[0] == "list") {
+		return entry.Fn(rest)
+	}
 	if verbs.IsMutating(entry.Name) {
 		oplog.Record(entry.Name)
 	}
@@ -375,13 +379,118 @@ func footer(verb string) {
 }
 
 func help(argv []string) int {
-	all := false
 	for _, a := range argv {
 		if a == "-all" || a == "--all" {
-			all = true
+			return helpAll()
+		}
+	}
+	return helpCompact()
+}
+
+// helpCompact prints one line of canonical names per category, then one line of
+// aliases. Both lines stay wrapped at COLUMNS so the whole table fits on screen.
+func helpCompact() int {
+	var order []string
+	names := make(map[string][]string)
+	aliases := make(map[string][]string)
+	for _, e := range verbs.All() {
+		if e.Hidden {
+			continue
+		}
+		if _, seen := names[e.Category]; !seen {
+			order = append(order, e.Category)
+		}
+		name, also := splitDisplay(e.Display())
+		names[e.Category] = append(names[e.Category], name)
+		aliases[e.Category] = append(aliases[e.Category], also...)
+	}
+
+	labelWidth := 0
+	for _, category := range order {
+		if n := len(category); n > labelWidth {
+			labelWidth = n
+		}
+	}
+	const gutter = 4 // two spaces, two spaces after the label
+	indent := strings.Repeat(" ", gutter+labelWidth)
+	width := termWidth() - gutter - labelWidth
+
+	for _, category := range order {
+		lines := wrapItems(names[category], width)
+		fmt.Printf("  %s  %s\n", ui.Cyan(fmt.Sprintf("%-*s", labelWidth, category)), names1(lines))
+		for _, line := range lines[1:] {
+			fmt.Printf("%s%s\n", indent, line)
+		}
+		if len(aliases[category]) == 0 {
+			continue
+		}
+		for i, line := range wrapItems(aliases[category], width-7) {
+			prefix := indent + ui.Dim("aka    ")
+			if i > 0 {
+				prefix = indent + strings.Repeat(" ", 7)
+			}
+			fmt.Printf("%s%s\n", prefix, ui.Dim(line))
 		}
 	}
 
+	fmt.Println()
+	fmt.Println(ui.Dim("  gg help --all  adds descriptions, hints and the git command behind each verb"))
+	return 0
+}
+
+// names1 returns the first wrapped line of names, cyan.
+func names1(lines []string) string { return ui.Cyan(lines[0]) }
+
+// splitDisplay cuts "branch (br, b)" into "branch" and [br b].
+func splitDisplay(display string) (string, []string) {
+	open := strings.Index(display, " (")
+	if open < 0 || !strings.HasSuffix(display, ")") {
+		return display, nil
+	}
+	name := display[:open]
+	inner := strings.TrimSuffix(display[open+2:], ")")
+	var aliases []string
+	for _, alias := range strings.Split(inner, ",") {
+		if alias = strings.TrimSpace(alias); alias != "" {
+			aliases = append(aliases, alias)
+		}
+	}
+	return name, aliases
+}
+
+// wrapItems lays items out as one string, breaking between items at width.
+func wrapItems(items []string, width int) []string {
+	if width < 20 {
+		width = 20
+	}
+	var lines []string
+	line := ""
+	for _, item := range items {
+		switch {
+		case line == "":
+			line = item
+		case len(line)+len(item)+3 <= width:
+			line += " · " + item
+		default:
+			lines = append(lines, line)
+			line = item
+		}
+	}
+	return append(lines, line)
+}
+
+// termWidth reads COLUMNS, falling back to the usual 80 columns.
+func termWidth() int {
+	if raw := os.Getenv("COLUMNS"); raw != "" {
+		if n, err := strconv.Atoi(raw); err == nil && n > 0 {
+			return n
+		}
+	}
+	return 80
+}
+
+// helpAll prints the full table: description, hint and git command per verb.
+func helpAll() int {
 	entries := verbs.All()
 
 	var order []string
@@ -419,17 +528,15 @@ func help(argv []string) int {
 			if e.Hint != "" {
 				line += "  " + ui.Dim(e.Hint)
 			}
-			if all {
-				if cmd := e.Command(); cmd != "" {
-					line += "  " + ui.Dim(cmd)
-				}
+			if cmd := e.Command(); cmd != "" {
+				line += "  " + ui.Dim(cmd)
 			}
 			fmt.Println(strings.TrimRight(line, " "))
 		}
 		fmt.Println()
 	}
 
-	fmt.Println("  flags: -n/--dry  -p/--print   help -all adds the git command behind each verb")
+	fmt.Println("  flags: -n/--dry  -p/--print   gg help --all shows all of this")
 	fmt.Println("  env: GG_ECHO=1 traces the git call")
 	return 0
 }

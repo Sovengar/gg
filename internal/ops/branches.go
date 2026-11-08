@@ -6,6 +6,7 @@ import (
 
 	"gg/internal/gitx"
 	"gg/internal/ids"
+	"gg/internal/oplog"
 	"gg/internal/ui"
 )
 
@@ -29,6 +30,7 @@ func Branches(args []string) int {
 			ui.Errf("gg branch new <name>: name the branch to create")
 			return 2
 		}
+		oplog.Record("branch")
 		WipAmend()
 		return gitx.Run(append([]string{"switch", "-c"}, args[1:]...)...)
 	}
@@ -38,6 +40,7 @@ func Branches(args []string) int {
 		ui.Errf("gg branch: no branch or commit named %s. gg cbr %s creates it.", target, target)
 		return 2
 	}
+	oplog.Record("branch")
 	WipAmend()
 	return gitx.Run(append([]string{"switch"}, args...)...)
 }

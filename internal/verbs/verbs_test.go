@@ -6,15 +6,20 @@ import (
 )
 
 func TestLookup(t *testing.T) {
-	e, ok := Lookup("st")
+	e, ok := Lookup("log")
 	if !ok {
-		t.Fatal("st not found")
+		t.Fatal("log not found")
 	}
-	if e.IsFunc() {
-		t.Error("st should be a git argv verb")
+	if !e.IsFunc() {
+		t.Error("log should be a Go function")
 	}
-	got := e.Argv([]string{"-u"})
-	want := []string{"status", "--short", "-u"}
+
+	git, ok := Lookup("reflog")
+	if !ok {
+		t.Fatal("reflog not found")
+	}
+	got := git.Argv([]string{"--oneline"})
+	want := []string{"reflog", "--oneline"}
 	if len(got) != len(want) {
 		t.Fatalf("argv = %q, want %q", got, want)
 	}
@@ -26,7 +31,7 @@ func TestLookup(t *testing.T) {
 }
 
 func TestFuncVerbs(t *testing.T) {
-	for _, name := range []string{"log", "dash", "push", "update", "sync", "uncommit"} {
+	for _, name := range []string{"log", "dash", "status", "diff", "push", "update", "sync", "uncommit"} {
 		e, ok := Lookup(name)
 		if !ok || !e.IsFunc() || e.Fn == nil {
 			t.Errorf("%s should be a Go function", name)

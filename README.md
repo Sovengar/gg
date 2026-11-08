@@ -20,20 +20,21 @@ GOROOT= ~/.local/share/mise/installs/go/1.27.3/bin/go build -o ~/.local/bin/gg .
 ## Usage
 
 ```
-gg                 dashboard: branch, files, commits, branches
-gg status/st/sta/stf  Status, Status all or Status with files untracked
-gg stf             status including untracked
+gg                 dashboard: the tree over the five newest branches
+gg status/st/sta    the tree: files, worktree lanes, common base, hints
+gg stf             the same tree, up to five changed files under each commit
 gg log             short graph log, 6 commits by default, ✓ pushed / ↑ local
 gg log 20          more of it, extra args go to git log
 gg log -l 40       long line: relative age and author
 gg branch          branches sorted by recency (alias: br)
 gg reflog          reflog
+gg diff            diff in boxes, one per change (plain git diff when piped)
 gg diff -w         diff ignoring whitespace
 gg copy kd main    copy that commit onto main, back on your branch after (alias: cp)
 gg copy kd         copy it onto the branch you are on
 gg c -m "msg"      commit every dirty path (aliases: commit, ca)
 gg c -m "msg" kd qz  commit only those changeIds
-gg discard kd      drop that change, keep the rest (alias: rs); undoable with gg undo
+gg discard kd      drop that change, keep the rest; undoable with gg undo
 gg discard         drop every edit, keep the new files
 gg clear           drop every edit and delete the new files (-f skips the question)
 gg new             save the changes, then absorb more until you commit
@@ -49,8 +50,9 @@ gg wt new side     a worktree for a branch, one directory each
 gg wt ls           each worktree, its path and how dirty it is
 gg wt rm side      remove it, --force when dirty
 gg absorb          git absorb
+gg fetch           fetch --all --prune: every remote, dead refs dropped
 gg update / gg up  fetch --prune --all + pull --rebase --autostash
-gg push / gg pu    push, refuse on drift, offer force-with-lease
+gg push / gg p     push, refuse on drift, offer force-with-lease
 gg sync <branch>   pull --rebase origin <branch>, then push
 gg sync            fails: the branch argument is required
 gg abort           abort whichever operation is stuck: rebase, merge, cherry-pick
@@ -58,24 +60,25 @@ gg undo            step back to the state before the last operation
 gg undo 3          step back three operations
 gg redo            step forward again after an undo
 gg oplog           the operations undo can reach
+gg oplog clear     drop the log, then git gc --prune=now frees the objects
+gg undo --force    undo even when it removes published commits
 gg raw log -5      anything goes, still recorded
-gg help            verb table (alias: h)
-gg help -all       verb table + the git command behind each verb
+gg help            compact verb table: canonical names per category, aliases under (alias: h)
+gg help -all       full table: description, hint and the git command per verb
 gg tools           external tools + install state
 ```
 
 Unknown verbs go straight to git: `gg log --oneline -5` runs `git log --oneline -5`.
 
-Help is grouped like `but --help`: Title Case categories with a colon —
-Inspection, Rollback work, Register work, Edit saved work, Branching,
-Operations, Remote, Tools. There is no stash: the working tree, the index and
-wip commits are one mechanism (`gg new`, `gg wt`).
-The canonical name comes first, short variants in
-parentheses: `commit (c)`, `push (pu)`, `status (st, sta, stf)`,
-`reword (rename, describe, desc)`. Parameter notes print in grey after the
-description.
-`gg help` (or `gg h`) shows the verb table only; `gg help -all` adds the git command behind
-each row.
+Help is grouped by category: Inspection, Rollback work, Register work,
+Edit saved work, Branching, Operations, Remote, Tools. There is no stash: the
+working tree, the index and wip commits are one mechanism (`gg new`, `gg wt`).
+`gg help` (or `gg h`) prints one line of canonical names per category, then a
+grey `aka` line with that category's aliases, so the whole table stays on
+screen. Both lines wrap at `COLUMNS`, 80 by default.
+`gg help --all` prints the full table: description, grey parameter hint and the
+git command behind each verb, with the aliases in parentheses after the name,
+e.g. `commit (c, ca)`, `reword (rename, describe, desc)`.
 
 Flags: `-p/--print`, `-n/--dry` print the resolved command instead of running.
 Environment: `GG_ECHO=1` traces the git call, `NO_COLOR=1` disables colour.
@@ -269,11 +272,12 @@ interactive rebase on that commit, you amend it, and `gg continue` resumes.
 
 ## Semantics
 
-- Every mutating verb records an oplog entry before it runs: HEAD and the full worktree
-  (tracked and untracked, `.gitignore` respected). `gg oplog` lists them newest first,
-  `gg undo` restores the state before the last operation, `gg undo N` goes back N
-  entries, and `gg redo` moves forward again when the last action was an undo. This
-  also makes `gg discard` and `gg clear` revertible. The newest 100 entries are kept.
+- Every mutating verb records an oplog entry before it runs: HEAD, the full worktree
+  (tracked and untracked, `.gitignore` respected), and branches, tags and `refs/gg/*`.
+  `refs/remotes` is never touched. `gg oplog` lists them newest first, `gg undo` restores
+  the state before the last operation, `gg undo N` goes back N entries, and `gg redo`
+  moves forward again when the last action was an undo. This also makes `gg discard`,
+  `gg clear` and branch or tag changes revertible. The newest 100 entries are kept.
 - Every mutating verb ends with a footer: `@ <sha> · ahead N · behind M`.
 - `gg push` never force-pushes on its own. It reports the drift, lists the incoming
   commits, and asks: update, force-with-lease, or abort. Non-interactive runs refuse.
