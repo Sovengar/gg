@@ -563,9 +563,12 @@ assert_contains "br points at cbr" "$("$BIN" br nope 2>&1)" "gg cbr nope"
 "$BIN" branch new fresh >/dev/null 2>&1
 assert_eq "branch new creates and switches" "$(git rev-parse --abbrev-ref HEAD)" "fresh"
 "$BIN" br tb >/dev/null 2>&1
-"$BIN" dbr side >/dev/null 2>&1
+recent=$(NO_COLOR=1 "$BIN" dbr side 2>/dev/null)
 assert_eq "dbr deletes a merged branch" "$(git for-each-ref refs/heads/side --format='%(refname:short)')" ""
 assert_eq "dbr keeps a backup ref" "$(git for-each-ref refs/gg/deleted/side --format='%(refname)')" "refs/gg/deleted/side"
+assert_contains "dbr lists the newest branches" "$recent" "branches (5 newest"
+assert_contains "dbr keeps the default branch in view" "$recent" "tb"
+assert_eq "dbr lists a branch once" "$(printf '%s\n' "$recent" | grep -c tb)" "1"
 git branch unmerged side >/dev/null 2>&1
 if "$BIN" br -d unmerged >/dev/null 2>&1; then no "br -d refuses unmerged work"; else ok "br -d refuses unmerged work"; fi
 "$BIN" br -D unmerged >/dev/null 2>&1

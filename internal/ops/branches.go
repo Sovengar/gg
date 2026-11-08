@@ -42,45 +42,146 @@ func Branches(args []string) int {
 	return gitx.Run(append([]string{"switch"}, args...)...)
 }
 
-func listBranches() int {
+// branchRow is one local branch, parsed from a for-each-ref line.
+type branchRow struct {
+	name     string
+	sha      string
+	upstream string
+	current  bool
+}
+
+// branchRows lists local branches newest first.
+func branchRows() []branchRow {
 	lines, err := gitx.OutputAll("for-each-ref",
 		"--sort=-committerdate", "refs/heads",
 		"--format=%(refname:short)%1f%(objectname)%1f%(upstream:short)%1f%(HEAD)")
-	if err != nil || len(lines) == 0 {
+	if err != nil {
+		return nil
+	}
+	rows := make([]branchRow, 0, len(lines))
+	for _, l := range lines {
+		parts := strings.Split(l, "\x1f")
+		if len(parts) < 3 {
+			continue
+		}
+		rows = append(rows, branchRow{
+			name:     parts[0],
+			sha:      parts[1],
+			upstream: parts[2],
+			current:  len(parts) > 3 && parts[3] == "*",
+		})
+	}
+	return rows
+}
+
+// branchLine renders one branch with its changeId, its upstream drift and,
+// when it is the default branch, a mark for it.
+func branchLine(r branchRow, nameWidth int, bidx *ids.BranchIndex, def string) string {
+	marker := " "
+	if r.current {
+		marker = "*"
+	}
+	line := fmt.Sprintf("  %s %s %-*s", ui.Green(marker), ui.Red(bidx.ChangeID(r.name)), nameWidth, r.name)
+	if r.upstream == "" {
+		line += "  " + ui.Dim("no upstream")
+	} else {
+		ahead, _ := gitx.Count(r.upstream + ".." + r.sha)
+		behind, _ := gitx.Count(r.sha + ".." + r.upstream)
+		line += "  " + ui.Dim(fmt.Sprintf("↑%d ↓%d", ahead, behind))
+	}
+	if def != "" && r.name == def {
+		line += "  " + ui.Dim("default")
+	}
+	return line
+}
+
+func listBranches() int {
+	rows := branchRows()
+	if len(rows) == 0 {
 		ui.Errf("gg branch: no branches yet")
 		return 1
 	}
 
-	bidx, err := ids.LoadBranches()
-	if err != nil {
-		bidx = &ids.BranchIndex{}
-	}
-
-	nameWidth := 0
-	for _, l := range lines {
-		if name, _, _ := strings.Cut(l, "\x1f"); len(name) > nameWidth {
-			nameWidth = len(name)
-		}
-	}
-
-	for _, l := range lines {
-		parts := strings.Split(l, "\x1f")
-		name, sha, upstream := parts[0], parts[1], parts[2]
-		marker := " "
-		if len(parts) > 3 && parts[3] == "*" {
-			marker = "*"
-		}
-		line := fmt.Sprintf("  %s %s %-*s", ui.Green(marker), ui.Red(bidx.ChangeID(name)), nameWidth, name)
-		if upstream == "" {
-			line += "  " + ui.Dim("no upstream")
-		} else {
-			ahead, _ := gitx.Count(upstream + ".." + sha)
-			behind, _ := gitx.Count(sha + ".." + upstream)
-			line += "  " + ui.Dim(fmt.Sprintf("↑%d ↓%d", ahead, behind))
-		}
-		fmt.Println(line)
+	bidx := branchIndexOrEmpty()
+	nameWidth := widestName(rows)
+	for _, r := range rows {
+		fmt.Println(branchLine(r, nameWidth, bidx, ""))
 	}
 	return 0
+}
+
+// recentBranches prints the newest branches and always the default branch, so
+// a branch operation ends with the list it just changed.
+func recentBranches(limit int) {
+	rows := branchRows()
+	if len(rows) == 0 {
+		return
+	}
+
+	def := defaultBranch()
+	shown := rows
+	if len(rows) > limit {
+		shown = rows[:limit]
+	}
+	if def != "" && !holdsName(shown, def) {
+		for _, r := range rows {
+			if r.name == def {
+				shown = append(append([]branchRow{}, shown...), r)
+				break
+			}
+		}
+	}
+
+	bidx := branchIndexOrEmpty()
+	nameWidth := widestName(shown)
+	fmt.Println(ui.Dim(fmt.Sprintf("  branches (%d newest, default always):", limit)))
+	for _, r := range shown {
+		fmt.Println(branchLine(r, nameWidth, bidx, def))
+	}
+}
+
+func branchIndexOrEmpty() *ids.BranchIndex {
+	bidx, err := ids.LoadBranches()
+	if err != nil {
+		return &ids.BranchIndex{}
+	}
+	return bidx
+}
+
+func widestName(rows []branchRow) int {
+	width := 0
+	for _, r := range rows {
+		if len(r.name) > width {
+			width = len(r.name)
+		}
+	}
+	return width
+}
+
+func holdsName(rows []branchRow, name string) bool {
+	for _, r := range rows {
+		if r.name == name {
+			return true
+		}
+	}
+	return false
+}
+
+// defaultBranch names the branch a repository is expected to keep: the one
+// origin points HEAD at, else a conventional name, else the current branch.
+func defaultBranch() string {
+	if out, err := gitx.Output("symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"); err == nil && out != "" {
+		return strings.TrimPrefix(out, "origin/")
+	}
+	for _, name := range []string{"main", "master", "trunk", "develop"} {
+		if branchExists(name) {
+			return name
+		}
+	}
+	if cur, err := gitx.Output("rev-parse", "--abbrev-ref", "HEAD"); err == nil && cur != "HEAD" {
+		return cur
+	}
+	return ""
 }
 
 // revExists reports whether the token resolves to any commit.
@@ -115,6 +216,7 @@ func DeleteBranch(args []string) int {
 
 	current, _ := gitx.Output("rev-parse", "--abbrev-ref", "HEAD")
 	rc := 0
+	deleted := 0
 	for _, name := range names {
 		if name == current {
 			ui.Errf("gg dbr: %s is the current branch; switch away first", name)
@@ -146,6 +248,10 @@ func DeleteBranch(args []string) int {
 		gitx.Output("update-ref", "refs/gg/deleted/"+name, sha)
 		ui.Errf("gg: %s is deleted. Its tip stays in refs/gg/deleted/%s", name, name)
 		ui.Errf("gg: to bring it back: gg cbr %s %s", name, sha)
+		deleted++
+	}
+	if deleted > 0 {
+		recentBranches(5)
 	}
 	return rc
 }

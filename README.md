@@ -160,6 +160,19 @@ verbs (`gg br`, `gg sw`, `gg cbr`, `gg dbr`, `gg mg`) read a branch changeId
 first, so `gg br 4d` names the branch even when another branch holds the same
 commit.
 
+### Branch list after a delete
+
+`gg dbr` ends with the branch list it just changed: the five newest branches
+and the default branch, always. The default branch is the one `origin/HEAD`
+points at, else `main`, `master`, `trunk` or `develop`, else the current branch.
+
+```
+  branches (5 newest, default always):
+    be b     no upstream
+    pk c     no upstream
+  * 2h main  no upstream  default
+```
+
 ### External tools
 
 Registered as `tool:<binary>` in `verbs.tsv`. Extra args are passed through.
