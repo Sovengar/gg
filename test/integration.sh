@@ -345,6 +345,22 @@ assert_eq "edit stops the rebase" "$(git rev-parse --abbrev-ref HEAD)" "HEAD"
 assert_eq "abort restores the branch" "$(git rev-parse --abbrev-ref HEAD)" "tb"
 if "$BIN" abort >/dev/null 2>&1; then no "abort reports nothing to abort"; else ok "abort reports nothing to abort"; fi
 
+echo "edit a merge commit"
+R=$(newrepo)
+cd "$R" || exit 1
+git switch -qc side
+git commit -q --allow-empty -m "side work"
+git switch -q tb
+git commit -q --allow-empty -m "main work"
+git merge -q --no-ff side -m "merge side"
+mergeId=$("$BIN" log 1 | awk '{print $2}')
+"$BIN" edit "$mergeId" >/dev/null 2>&1
+assert_eq "edit stops on the merge" "$(git rev-parse --abbrev-ref HEAD)" "HEAD"
+git commit -q --amend --no-edit
+"$BIN" continue >/dev/null 2>&1
+assert_eq "continue keeps both merge parents" "$(git rev-list --parents -n1 HEAD | wc -w)" "3"
+if "$BIN" squash "$("$BIN" log 1 | awk '{print $2}')" >/dev/null 2>&1; then no "squash refuses a merge"; else ok "squash refuses a merge"; fi
+
 echo "git history verbs"
 R=$(newrepo)
 cd "$R" || exit 1

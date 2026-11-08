@@ -187,13 +187,26 @@ func stopAt(commit, action string) int {
 	}
 	commit = sha
 
+	merge := isMerge(commit)
+	if merge && action != "edit" {
+		ui.Errf("gg: %s is a merge commit; a merge cannot fold into its parent", commit)
+		return 1
+	}
+
 	self, err := os.Executable()
 	if err != nil {
 		ui.Errf("gg: cannot find my own binary: %v", err)
 		return 1
 	}
 	editor := fmt.Sprintf("%s __seq-edit %s %s", self, action, commit)
-	cmd := exec.Command("git", "rebase", "-i", "--autostash", "--empty=drop", commit+"^")
+	argv := []string{"rebase", "-i", "--autostash", "--empty=drop"}
+	if merge {
+		// A plain rebase drops merge commits, so the target would never
+		// appear in the plan. Keeping the merges puts it there.
+		argv = append(argv, "--rebase-merges")
+	}
+	argv = append(argv, commit+"^")
+	cmd := exec.Command("git", argv...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -224,28 +237,56 @@ func SeqEdit(args []string) int {
 	}
 
 	lines := strings.Split(string(data), "\n")
+	out := make([]string, 0, len(lines)+1)
 	matched := false
-	for i, line := range lines {
+	for _, line := range lines {
+		out = append(out, line)
+		if matched {
+			continue
+		}
 		fields := strings.Fields(line)
 		if len(fields) < 2 {
+			continue
+		}
+		if fields[0] == "merge" {
+			// A merge line reads "merge -C <commit> <label>". git has no
+			// edit for it, so stop the rebase right after the merge.
+			if len(fields) < 3 || (fields[1] != "-C" && fields[1] != "-c") || !sameCommit(fields[2], commit) {
+				continue
+			}
+			if action != "edit" {
+				ui.Errf("gg: %s is a merge commit; a merge cannot fold into its parent", commit)
+				return 1
+			}
+			out = append(out, "break")
+			matched = true
 			continue
 		}
 		if !sameCommit(fields[1], commit) {
 			continue
 		}
 		fields[0] = action
-		lines[i] = strings.Join(fields, " ")
+		out[len(out)-1] = strings.Join(fields, " ")
 		matched = true
 	}
 	if !matched {
 		ui.Errf("gg: %s is not inside the rebase range", commit)
 		return 1
 	}
-	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(strings.Join(out, "\n")), 0o644); err != nil {
 		ui.Errf("gg: cannot write the rebase plan: %v", err)
 		return 1
 	}
 	return 0
+}
+
+// isMerge reports whether a commit has more than one parent.
+func isMerge(sha string) bool {
+	out, err := gitx.Output("rev-list", "--parents", "-n", "1", sha)
+	if err != nil {
+		return false
+	}
+	return len(strings.Fields(out)) > 2
 }
 
 func sameCommit(a, b string) bool {

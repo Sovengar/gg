@@ -296,6 +296,11 @@ jujutsu makes a commit the working copy: `jj edit <rev>`. git has no working
 copy commit, so `gg edit <id>` is the closest equivalent — it stops an
 interactive rebase on that commit, you amend it, and `gg continue` resumes.
 
+A merge commit is editable the same way: gg replays the history with
+`--rebase-merges` and stops right after the merge, so `git commit --amend`
+keeps both parents and `gg continue` replays the rest. `gg squash` refuses a
+merge, since a merge cannot fold into a single parent.
+
 ## Semantics
 
 - Every mutating verb records an oplog entry before it runs: HEAD, the full worktree
