@@ -31,7 +31,7 @@ func TestLookup(t *testing.T) {
 }
 
 func TestFuncVerbs(t *testing.T) {
-	for _, name := range []string{"log", "dash", "status", "diff", "push", "update", "sync", "uncommit"} {
+	for _, name := range []string{"log", "dash", "status", "diff", "push", "update", "sync", "uncommit", "init", "clone", "rebase", "tag", "remote", "brlm", "land"} {
 		e, ok := Lookup(name)
 		if !ok || !e.IsFunc() || e.Fn == nil {
 			t.Errorf("%s should be a Go function", name)

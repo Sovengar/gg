@@ -60,7 +60,7 @@ assert_contains "help lists status" "$out" "status"
 assert_contains "help groups a shorthand under its verb" "$out" "status st"
 assert_lacks "help has no branches alias" "$out" "branches"
 assert_contains "help names the aliases verb first" "$out" "describe -> reword, rename"
-assert_contains "help keeps variants off the canonical line" "$(NO_COLOR=1 "$BIN" help | sed -n 1p)" "branch br · changeId id"
+assert_contains "help keeps variants off the canonical line" "$(NO_COLOR=1 "$BIN" help | grep Inspection)" "branch br · changeId id"
 assert_contains "hh merges the status variants into one cell" "$("$BIN" hh)" "status st, -a sta, -f stf"
 assert_contains "hh merges the branch variants" "$("$BIN" hh)" "branch br, -lr, -a, -la, -lm, -c cbr, -d dbr, -D Dbr"
 assert_lacks "hh drops the positional branch row" "$("$BIN" hh)" "<name>"
@@ -1027,6 +1027,58 @@ git clone -q -b tb "$R-upstream.git" "$C"
 out=$("$BIN" up --check)
 assert_contains "check counts the upstream commit" "$out" "1 behind"
 assert_eq "check leaves HEAD alone" "$(git log -1 --format=%s)" "init"
+
+echo "init and clone"
+has() { [ -e "$1" ] && echo yes || echo no; }
+
+R=$(mktemp -d)
+out=$(cd "$R" && "$BIN" init 2>&1)
+rc=$?
+assert_eq "init exits 0" "$rc" "0"
+assert_eq "init created the git repo" "$(has "$R/.git")" "yes"
+assert_contains "init says what the repo holds" "$out" "colocated"
+if command -v jj >/dev/null 2>&1; then
+	assert_eq "init colocated the jj repo" "$(has "$R/.jj")" "yes"
+fi
+
+R=$(mktemp -d)
+out=$(cd "$R" && "$BIN" init --no-colocate 2>&1)
+assert_eq "init --no-colocate created the git repo" "$(has "$R/.git")" "yes"
+assert_eq "init --no-colocate left jj out" "$(has "$R/.jj")" "no"
+assert_contains "init --no-colocate says git only" "$out" "git only"
+
+R=$(mktemp -d)
+out=$(cd "$R" && "$BIN" init --bare 2>&1)
+assert_eq "init --bare made a bare repo" "$(git -C "$R" rev-parse --is-bare-repository)" "true"
+assert_eq "init --bare left jj out" "$(has "$R/.jj")" "no"
+assert_contains "init --bare says bare" "$out" "bare"
+
+SRC=$(mktemp -d)/src
+git init -q -b tb "$SRC"
+(cd "$SRC" && git commit -q --allow-empty -m one)
+R=$(mktemp -d)
+out=$(cd "$R" && "$BIN" clone "$SRC" dst 2>&1)
+assert_eq "clone created the checkout" "$(has "$R/dst/.git")" "yes"
+assert_eq "clone fetched the history" "$(git -C "$R/dst" log -1 --format=%s)" "one"
+assert_contains "clone says what the checkout holds" "$out" "colocated"
+if command -v jj >/dev/null 2>&1; then
+	assert_eq "clone colocated the jj repo" "$(has "$R/dst/.jj")" "yes"
+	assert_contains "clone imported the history into jj" "$(cd "$R/dst" && jj log --no-graph -r @- -T description 2>/dev/null)" "one"
+fi
+
+R=$(mktemp -d)
+(cd "$R" && "$BIN" clone --bare "$SRC" bare.git) >/dev/null 2>&1
+assert_eq "clone --bare made a bare repo" "$(git -C "$R/bare.git" rev-parse --is-bare-repository)" "true"
+assert_eq "clone --bare left jj out" "$(has "$R/bare.git/.jj")" "no"
+
+R=$(mktemp -d)
+(cd "$R" && "$BIN" clone --bare "$SRC") >/dev/null 2>&1
+assert_eq "clone --bare without a dir names it after the url" "$(has "$R/src")" "yes"
+
+out=$("$BIN" clone 2>&1)
+rc=$?
+assert_eq "clone without a url exits 2" "$rc" "2"
+assert_contains "clone without a url names its usage" "$out" "gg clone <url>"
 
 echo
 echo "passed $pass, failed $fail"

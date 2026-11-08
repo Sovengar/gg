@@ -20,6 +20,8 @@ GOROOT= ~/.local/share/mise/installs/go/1.27.3/bin/go build -o ~/.local/bin/gg .
 ## Usage
 
 ```
+gg init            git init here, then colocate a jj repo on it (--no-colocate, --bare skip jj)
+gg clone <url>     git clone, then colocate a jj repo on it (then an optional dir)
 gg                 dashboard: the tree over the five newest branches
 gg status/st       the tree: files, worktree lanes, common base, hints
 gg status -f/stf   the same tree, up to five changed paths under each commit

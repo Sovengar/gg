@@ -81,17 +81,24 @@ var functions = map[string]func([]string) int{
 	"prNew":        ops.PRNew,
 	"prReview":     ops.PRReview,
 	"prReviewEdit": ops.PRReviewEdit,
+	"land":         ops.Land,
 	"new":          ops.New,
 	"commit":       ops.Commit,
 	"commitExclude": func(args []string) int {
 		return ops.Commit(append([]string{"-e"}, args...))
 	},
-	"discard": ops.Discard,
-	"clear":   ops.Clear,
-	"copy":    ops.Copy,
-	"undo":    undo,
-	"redo":    redo,
-	"oplog":   oplogList,
+	"init":           ops.Init,
+	"clone":          ops.Clone,
+	"discard":        ops.Discard,
+	"clear":          ops.Clear,
+	"copy":           ops.Copy,
+	"rebase":         ops.Rebase,
+	"tag":            ops.Tag,
+	"remote":         ops.Remote,
+	"mergedBranches": ops.MergedBranches,
+	"undo":           undo,
+	"redo":           redo,
+	"oplog":          oplogList,
 }
 
 func undo(args []string) int {

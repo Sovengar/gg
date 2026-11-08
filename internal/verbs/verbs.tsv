@@ -10,6 +10,10 @@
 # Mutating verbs get an oplog entry plus a footer.
 # Section headers ("# --- name ---") become the categories in gg help.
 
+# --- Setup ---
+init	fn:init	git init, then colocate a jj repo on top	hint:--no-colocate or --bare leave jj out
+clone	fn:clone	git clone, then colocate a jj repo on top	hint:Takes a url, then a directory. --no-colocate or --bare leave jj out
+
 # --- Inspection ---
 status|st	fn:tree	Overview of the workspace: files, branches, commits	hint:Takes a count
 sta	fn:treeAll	every changed path under every commit	hint:st -a shows all, st -f stops at five	display:status -a sta	variant
