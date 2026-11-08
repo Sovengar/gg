@@ -32,7 +32,7 @@ type Entry struct {
 	Hidden      bool
 	Variant     bool   // a flag on another verb, listed by gg hh only
 	DisplayOnly bool   // a help row with no name to type, e.g. branch -D
-	NoGit       bool   // no git equivalent to show in hhh
+	NoGit       bool   // no git equivalent behind the verb
 	Shown       string // name column override in help, e.g. status (st, sta, stf)
 	Fn          func(args []string) int
 }
@@ -300,6 +300,23 @@ func (e Entry) DisplayParts() (name, note string) {
 		return display[:i], display[i:]
 	}
 	return display, ""
+}
+
+// Parent resolves the verb a variant row flags: the first word of Display.
+func (e Entry) Parent() (Entry, bool) {
+	word, _, _ := strings.Cut(e.Display(), " ")
+	p, ok := table[word]
+	return p, ok
+}
+
+// VariantFlag is what a variant row adds to its parent's cell, the display
+// text minus the parent verb: "commit -a ca" gives "-a ca".
+func (e Entry) VariantFlag() string {
+	_, flag, found := strings.Cut(e.Display(), " ")
+	if !found {
+		return ""
+	}
+	return strings.TrimSpace(flag)
 }
 
 // Command is the git command behind the verb, empty when there is none to show.

@@ -75,8 +75,9 @@ gg oplog           the operations undo can reach
 gg oplog clear     drop the log, then git gc --prune=now frees the objects
 gg undo --force    undo even when it removes published commits
 gg help            compact verb table: canonical names per category, aliases under (alias: h)
-gg hh              the table with parameters and the flag variants
-gg hhh             full table: description, hint and the git command per verb
+gg h -v            one row per verb, with its description
+gg hh              the same table with the flag variants merged into their verb
+gg hh -v           one row per verb and flag variant, with the parameter hints
 gg tools           external tools + install state
 ```
 
@@ -90,10 +91,13 @@ with that category's aliases, verb first: `describe -> reword, rename`. Both
 lines wrap at `COLUMNS`, 80 by default. A shorthand sits grey next to its verb,
 no parentheses: `describe desc`, `commit c`. A real alias goes on the arrow
 line.
-`gg hh` lists the parameter hints and the flag variants, each variant named
-with the command it stands for: `status -a sta`, `status -f stf`.
-`gg hhh` prints the full table: description, grey parameter hint and the
-git command behind each verb.
+`gg hh` merges each flag variant into the cell of the verb it flags, name and
+flag together: `status st, -a sta, -f stf`, `branch br, -r, -a, -g, <name>, -c
+cbr, -d dbr, -D Dbr`. A variant lives on one row, its parameters in `hh -v`.
+`gg h -v` prints one row per verb with its description, no parameters.
+`gg hh -v` prints one row per verb and flag variant, with the grey parameter
+hint: `status -a sta  st -a shows all, st -f stops at five`.
+There is no `hhh`: the description lives in `h -v`, the parameters in `hh -v`.
 
 Flags: `-p/--print`, `-n/--dry` print the resolved command instead of running.
 Environment: `GG_ECHO=1` traces the git call, `NO_COLOR=1` disables colour.

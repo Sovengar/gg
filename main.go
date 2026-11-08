@@ -42,10 +42,10 @@ func main() {
 }
 
 func run(argv []string) int {
-	// the help words parse their own flags: -p there means params, not print mode
+	// the help words parse their own flags: -v there means verbose, not dry
 	if len(argv) > 0 {
 		switch argv[0] {
-		case "help", "h", "hh", "hhh":
+		case "help", "h", "hh":
 			return help(argv[0], argv[1:])
 		}
 	}
@@ -56,7 +56,7 @@ func run(argv []string) int {
 	}
 
 	switch args[0] {
-	case "help", "h", "hh", "hhh":
+	case "help", "h", "hh":
 		return help(args[0], args[1:])
 	case "version":
 		fmt.Println("gg " + version)
@@ -418,22 +418,62 @@ func footer(verb string) {
 	fmt.Println(ui.Dim(fmt.Sprintf("  %s · ahead %s · behind %s", changeIndex().Short(sha), ahead, behind)))
 }
 
+// help renders the table the word and the flags ask for. Each -v opens the
+// rows up one step: h, hh, then the parameter hints.
 func help(word string, argv []string) int {
-	switch word {
-	case "hh":
-		return helpParams()
-	case "hhh":
-		return helpAll()
-	}
+	verbose := false
 	for _, a := range argv {
 		switch a {
-		case "-all", "--all", "-a":
-			return helpAll()
-		case "-p", "--params":
-			return helpParams()
+		case "-v", "--verbose":
+			verbose = true
 		}
 	}
-	return helpCompact()
+	switch {
+	case word == "hh" && verbose:
+		return helpParams()
+	case word == "hh":
+		return helpTable(true)
+	case verbose:
+		return helpDescribed()
+	}
+	return helpTable(false)
+}
+
+// helpDescribed prints one row per verb: the name column and its description,
+// with no parameters. gg h -v is this view.
+func helpDescribed() int {
+	entries := verbs.All()
+	nameWidth := 0
+	for _, e := range entries {
+		if e.Hidden || e.Variant {
+			continue
+		}
+		if n := len(e.Display()); n > nameWidth {
+			nameWidth = n
+		}
+	}
+	if nameWidth > 34 {
+		nameWidth = 34
+	}
+
+	category := ""
+	for _, e := range entries {
+		if e.Hidden || e.Variant {
+			continue
+		}
+		if e.Category != category {
+			if category != "" {
+				fmt.Println()
+			}
+			category = e.Category
+			fmt.Println(ui.Dim(category))
+		}
+		fmt.Printf("  %s  %s\n", displayPadded(e, nameWidth), e.Description)
+	}
+
+	fmt.Println()
+	fmt.Println(ui.Dim("  gg hh -v  adds the parameters and their hints"))
+	return 0
 }
 
 // helpParams lists each verb with its parameters: the hint and the variants.
@@ -472,25 +512,31 @@ func helpParams() int {
 	}
 
 	fmt.Println()
-	fmt.Println(ui.Dim("  gg hhh  adds descriptions and the git command behind each verb"))
+	fmt.Println(ui.Dim("  gg h -v  adds a description per verb"))
 	return 0
 }
 
-// helpCompact prints one line of canonical names per category, then one line
-// naming the aliases of that category, verb first: "describe -> reword, rename".
-// Both lines stay wrapped at COLUMNS so the whole table fits on screen.
-func helpCompact() int {
+// helpTable prints one line of names per category, then one line naming the
+// aliases of that category, verb first: "describe -> reword, rename". Both
+// lines stay wrapped at COLUMNS so the whole table fits on screen. With merged
+// set, each verb carries the flag variants that belong to it: "status st, -a
+// sta, -f stf". gg h is this view, gg hh is the merged one.
+func helpTable(merged bool) int {
 	var order []string
 	names := make(map[string][]cell)
 	aliases := make(map[string][]cell)
+	extras := map[string][]string{}
+	if merged {
+		extras = variantExtras()
+	}
 	for _, e := range verbs.All() {
 		if e.Hidden || e.Variant {
-			continue // variants carry a flag, they belong to gg hh
+			continue // variants ride on their parent's cell
 		}
 		if _, seen := names[e.Category]; !seen {
 			order = append(order, e.Category)
 		}
-		names[e.Category] = append(names[e.Category], displayCell(e))
+		names[e.Category] = append(names[e.Category], nameCell(e, extras[e.Name]))
 		if len(e.Aliases) > 0 {
 			aliases[e.Category] = append(aliases[e.Category], aliasCell(e))
 		}
@@ -521,22 +567,54 @@ func helpCompact() int {
 	}
 
 	fmt.Println()
-	fmt.Println(ui.Dim("  gg hhh  adds descriptions, hints and the git command behind each verb"))
+	if merged {
+		fmt.Println(ui.Dim("  gg hh -v  adds the parameters and their hints"))
+	} else {
+		fmt.Println(ui.Dim("  gg h -v  adds a description per verb, gg hh the parameters"))
+	}
 	return 0
+}
+
+// variantExtras maps a verb to the flags its variant rows carry, in registry
+// order: status -> "-a sta", "-f stf".
+func variantExtras() map[string][]string {
+	extras := make(map[string][]string)
+	for _, e := range verbs.All() {
+		if e.Hidden || !e.Variant {
+			continue
+		}
+		parent, ok := e.Parent()
+		if !ok {
+			continue
+		}
+		if flag := e.VariantFlag(); flag != "" {
+			extras[parent.Name] = append(extras[parent.Name], flag)
+		}
+	}
+	return extras
 }
 
 // cell is one help item: its plain text and the same text painted.
 type cell struct{ plain, styled string }
 
-// displayCell paints a verb name cyan and its shorthand note dim.
-func displayCell(e verbs.Entry) cell {
+// nameCell paints a verb name cyan and its note dim, the flag variants
+// included when there are any.
+func nameCell(e verbs.Entry, extras []string) cell {
 	name, note := e.DisplayParts()
+	plain := e.Display()
+	if len(extras) > 0 {
+		note += ", " + strings.Join(extras, ", ")
+		plain += ", " + strings.Join(extras, ", ")
+	}
 	styled := ui.Cyan(name)
 	if note != "" {
 		styled += ui.Dim(note)
 	}
-	return cell{plain: e.Display(), styled: styled}
+	return cell{plain: plain, styled: styled}
 }
+
+// displayCell is nameCell without the flag variants.
+func displayCell(e verbs.Entry) cell { return nameCell(e, nil) }
 
 // aliasCell names one verb's aliases: the verb, an arrow and the aliases.
 func aliasCell(e verbs.Entry) cell {
@@ -622,58 +700,6 @@ func termWidth() int {
 		}
 	}
 	return 80
-}
-
-// helpAll prints the full table: description, hint and git command per verb.
-func helpAll() int {
-	entries := verbs.All()
-
-	var order []string
-	groups := make(map[string][]verbs.Entry)
-	for _, e := range entries {
-		if e.Hidden {
-			continue // an all-hidden category prints no header
-		}
-		if _, seen := groups[e.Category]; !seen {
-			order = append(order, e.Category)
-		}
-		groups[e.Category] = append(groups[e.Category], e)
-	}
-
-	nameWidth, descWidth := 0, 0
-	for _, e := range entries {
-		if n := len(e.Display()); n > nameWidth {
-			nameWidth = n
-		}
-		if n := len(e.Description); n > descWidth {
-			descWidth = n
-		}
-	}
-	if descWidth > 46 {
-		descWidth = 46
-	}
-
-	for _, category := range order {
-		fmt.Println(ui.Dim(category + ":"))
-		for _, e := range groups[category] {
-			if e.Hidden {
-				continue
-			}
-			line := fmt.Sprintf("  %s  %-*s", displayPadded(e, nameWidth), descWidth, e.Description)
-			if e.Hint != "" {
-				line += "  " + ui.Dim(e.Hint)
-			}
-			if cmd := e.Command(); cmd != "" {
-				line += "  " + ui.Dim(cmd)
-			}
-			fmt.Println(strings.TrimRight(line, " "))
-		}
-		fmt.Println()
-	}
-
-	fmt.Println("  flags: -n/--dry  -p/--print   gg hhh shows all of this")
-	fmt.Println("  env: GG_ECHO=1 traces the git call")
-	return 0
 }
 
 // showIDs prints the commit behind one or more changeIDs.
