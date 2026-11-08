@@ -171,6 +171,49 @@ func Continue(args []string) int {
 	return gitx.Run("rebase", "--continue")
 }
 
+// StopAmend folds uncommitted edits into the commit where a rebase stopped for
+// gg edit. It does nothing when no rebase is in progress, when the stop is not
+// an edit point, when the index has conflicts, or when the tree is clean.
+func StopAmend() {
+	if !inSequence() {
+		return
+	}
+	path, err := gitx.Output("rev-parse", "--git-path", "rebase-merge/done")
+	if err != nil {
+		return
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+	if !stoppedOnEdit(string(data)) {
+		return
+	}
+	if gitx.Unmerged() || !gitx.Dirty() {
+		return
+	}
+	if rc := gitx.Run("add", "-A"); rc != 0 {
+		return
+	}
+	if rc := gitx.Run("commit", "--amend", "--no-edit"); rc != 0 {
+		return
+	}
+}
+
+// stoppedOnEdit reports whether the rebase todo last ran an edit point: an
+// edit command for a commit, or a break for right after a merge.
+func stoppedOnEdit(done string) bool {
+	lines := strings.Split(done, "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		line := strings.TrimSpace(lines[i])
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		return line == "break" || strings.HasPrefix(line, "edit ")
+	}
+	return false
+}
+
 func stopAt(commit, action string) int {
 	dir, err := gitx.Output("rev-parse", "--git-path", "rebase-merge")
 	if err == nil {

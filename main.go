@@ -268,6 +268,13 @@ var wipFold = map[string]bool{
 	"uncommit": true,
 }
 
+// noSnapshot lists the verbs that must see the tree exactly as the user left
+// it. Snapshotting first would let gg abort or gg undo step over, or reset,
+// commits that already absorbed the edits they are meant to drop.
+var noSnapshot = map[string]bool{
+	"abort": true, "undo": true, "redo": true,
+}
+
 func isRef(token string) bool {
 	_, err := gitx.Output("rev-parse", "--verify", "--quiet", token)
 	return err == nil
@@ -288,6 +295,9 @@ func execArgv(argv []string, verb string, m mode) int {
 	}
 	if wipFold[verb] {
 		ops.WipAmend()
+	}
+	if !noSnapshot[verb] {
+		ops.StopAmend()
 	}
 	if os.Getenv("GG_ECHO") != "" {
 		ui.Errf("+ git %s", quote(argv))
@@ -312,6 +322,9 @@ func execFunc(entry verbs.Entry, typed string, rest []string, m mode) int {
 	}
 	if wipFold[entry.Name] {
 		ops.WipAmend()
+	}
+	if !noSnapshot[entry.Name] {
+		ops.StopAmend()
 	}
 	if os.Getenv("GG_ECHO") != "" {
 		ui.Errf("+ gg %s", strings.TrimSpace(typed+" "+quote(rest)))

@@ -294,7 +294,9 @@ sha does.
 
 jujutsu makes a commit the working copy: `jj edit <rev>`. git has no working
 copy commit, so `gg edit <id>` is the closest equivalent — it stops an
-interactive rebase on that commit, you amend it, and `gg continue` resumes.
+interactive rebase on that commit, and `gg continue` resumes. Every gg command
+first snapshots the working tree into the stopped commit, the way jj snapshots
+the working copy, so there is no `git commit --amend` to run by hand.
 
 A merge commit is editable the same way: gg replays the history with
 `--rebase-merges` and stops right after the merge, so `git commit --amend`

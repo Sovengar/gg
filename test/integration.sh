@@ -361,6 +361,36 @@ git commit -q --amend --no-edit
 assert_eq "continue keeps both merge parents" "$(git rev-list --parents -n1 HEAD | wc -w)" "3"
 if "$BIN" squash "$("$BIN" log 1 | awk '{print $2}')" >/dev/null 2>&1; then no "squash refuses a merge"; else ok "squash refuses a merge"; fi
 
+echo "edit snapshots on every verb"
+R=$(newrepo)
+cd "$R" || exit 1
+echo base > f.txt
+git add . >/dev/null 2>&1
+git commit -q -m "base file"
+echo next > g.txt
+git add . >/dev/null 2>&1
+git commit -q -m next
+editId=$("$BIN" log 2 | tail -1 | awk '{print $2}')
+"$BIN" edit "$editId" >/dev/null 2>&1
+assert_eq "snapshot edit stops the rebase" "$(git rev-parse --abbrev-ref HEAD)" "HEAD"
+echo edited >> f.txt
+echo new > added.txt
+"$BIN" log >/dev/null 2>&1
+assert_contains "a read-only verb folds the tracked edit" "$(git show HEAD:f.txt)" "edited"
+assert_eq "a read-only verb commits the new file" "$(git show HEAD:added.txt)" "new"
+assert_eq "the snapshot leaves the tree clean" "$(git status --porcelain)" ""
+"$BIN" continue >/dev/null 2>&1
+assert_eq "continue finishes the edit rebase" "$(git rev-parse --abbrev-ref HEAD)" "tb"
+assert_contains "continue keeps the folded tracked edit" "$(git show HEAD~1:f.txt)" "edited"
+assert_eq "continue keeps the folded new file" "$(git show HEAD~1:added.txt)" "new"
+
+againId=$("$BIN" log 1 | awk '{print $2}')
+"$BIN" edit "$againId" >/dev/null 2>&1
+echo abort-kept > kept.txt
+"$BIN" abort >/dev/null 2>&1
+assert_eq "abort restores the branch after an edit" "$(git rev-parse --abbrev-ref HEAD)" "tb"
+assert_contains "abort keeps the edit in the worktree" "$(cat kept.txt)" "abort-kept"
+
 echo "git history verbs"
 R=$(newrepo)
 cd "$R" || exit 1
