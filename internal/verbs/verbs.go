@@ -119,7 +119,7 @@ var mutating = map[string]bool{
 	"new": true, "discard": true, "clear": true, "cl": true,
 	"revert": true, "rv": true,
 	"reword": true, "rename": true, "describe": true, "desc": true,
-	"sw": true, "cbr": true, "dbr": true, "delete-branch": true,
+	"cbr": true, "dbr": true, "delete-branch": true,
 	"mg": true, "wt": true, "re": true,
 }
 

@@ -223,7 +223,7 @@ func pathVerb(name string) bool { return pathVerbs[name] }
 // branchVerbs take a branch name or a branch changeId.
 var branchVerbs = map[string]bool{
 	"branch": true, "br": true, "branches": true,
-	"sw": true, "switch": true, "cbr": true,
+	"cbr": true,
 	"dbr": true, "delete-branch": true, "mg": true, "merge": true,
 }
 
@@ -240,14 +240,17 @@ func newSubcommand(name string) bool { return newSubcommandVerbs[name] }
 // removed verbs name the verb that took their work, so an old habit fails with
 // a direction instead of a git error.
 var removed = map[string]string{
-	"cl-wd": "Use gg discard to drop edits, and gg clear to delete new files.",
-	"cl-sa": "It took the index. Use gg discard or gg clear.",
-	"us":    "It took the index. Use gg discard or gg clear.",
+	"sw":     "Use gg br <name> to switch, or gg cbr <name> to create and switch.",
+	"switch": "Use gg br <name> to switch, or gg cbr <name> to create and switch.",
+	"cl-wd":  "Use gg discard to drop edits, and gg clear to delete new files.",
+	"cl-sa":  "It took the index. Use gg discard or gg clear.",
+	"us":     "It took the index. Use gg discard or gg clear.",
+	"raw":    "An unknown verb still reaches git: gg <verb>. The call is no longer recorded for undo.",
 }
 
 // noResolve are verbs whose arguments are not changeIDs.
 var noResolve = map[string]bool{
-	"raw": true, "undo": true, "redo": true, "oplog": true,
+	"undo": true, "redo": true, "oplog": true,
 }
 
 // wipFold lists the verbs that fold uncommitted edits into an active wip
@@ -257,7 +260,7 @@ var noResolve = map[string]bool{
 // for a command that changes nothing.
 var wipFold = map[string]bool{
 	"update": true, "up": true, "sync": true,
-	"sw": true, "switch": true, "cbr": true, "mg": true, "merge": true,
+	"cbr": true, "mg": true, "merge": true,
 	"amend": true, "absorb": true, "edit": true, "continue": true,
 	"reword": true, "rename": true, "describe": true, "desc": true,
 	"squash": true, "split": true, "move": true, "abandon": true, "copy": true, "cp": true,

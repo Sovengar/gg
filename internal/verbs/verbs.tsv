@@ -16,7 +16,7 @@ log	fn:log	graph log, 6 commits by default	hint:Takes a count, -l for long lines
 dash	fn:dash	dashboard: the tree over the newest branches	hidden
 diff	fn:diff	diff the tree in boxes	hint:Use -w to ignore whitespace
 show	show	one commit in full	hint:Takes a changeId
-branch|br|branches	fn:branches	branches, or switch to one	hint:bare lists local changeIds. -r remote, -a both, new <name> creates	display:branch (br)
+branch|br|branches	fn:branches	list branches, or switch to one	hint:bare lists local changeIds. -r remote, -a both, new <name> creates	display:branch (br)
 brr	branch -r	remote branches, straight from git	display:br -r	variant
 bra	branch -a	local and remote branches in one list	display:br -a	variant
 id	id	resolve a changeId to a sha	nogit
@@ -45,7 +45,7 @@ move	fn:move	replay a commit onto another base	hint:Takes a changeId
 edit	fn:edit	stop a rebase at a commit	hint:Takes a changeId
 
 # --- Branching ---
-sw	switch	change branch	hint:Takes a branch
+branch switch	fn:branches	change branch	hint:Takes a branch	display:branch (br)	displayonly
 cbr	switch -c	branch new and switch	hint:Takes a branch. branch new <name> works too	display:branch -c (cbr)
 dbr|delete-branch	fn:deleteBranch	delete a branch, tip kept in a ref	hint:Safe: unmerged commits stay. Takes a branch or a changeId	display:branch -d (dbr)
 branch -D	branch -D	delete a branch even when unmerged	hint:Force. Drops unmerged commits, keeps the tip ref	display:branch -D	variant	displayonly

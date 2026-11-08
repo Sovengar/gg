@@ -416,7 +416,7 @@ assert_eq "new commits a wip" "$(git log -1 --format=%s)" "wip"
 assert_eq "new leaves the tree clean" "$(git status --porcelain)" ""
 assert_eq "new marks the wip" "$(git rev-parse --verify --quiet refs/gg/wip)" "$(git rev-parse HEAD)"
 echo edit >> f.txt
-"$BIN" sw tb >/dev/null 2>&1
+"$BIN" br tb >/dev/null 2>&1
 assert_eq "a rewinding verb folds the edit" "$(git rev-list --count HEAD)" "2"
 assert_eq "the fold leaves the tree clean" "$(git status --porcelain)" ""
 assert_eq "the fold keeps the wip marker" "$(git rev-parse --verify --quiet refs/gg/wip)" "$(git rev-parse HEAD)"
@@ -694,8 +694,8 @@ assert_eq "undo returns after removing a created branch" "$(git rev-parse --abbr
 
 
 git branch other
-"$BIN" sw other >/dev/null 2>&1
-assert_eq "sw switched branches" "$(git rev-parse --abbrev-ref HEAD)" "other"
+"$BIN" br other >/dev/null 2>&1
+assert_eq "br switched branches" "$(git rev-parse --abbrev-ref HEAD)" "other"
 "$BIN" undo >/dev/null 2>&1
 assert_eq "undo returns to the original branch" "$(git rev-parse --abbrev-ref HEAD)" "tb"
 

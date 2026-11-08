@@ -119,7 +119,7 @@ refuses when nobody can answer.
 
 `gg new` turns the working tree into a commit on the current branch. While that
 commit is HEAD, `gg dash` prints a `wip` badge, the verbs that rewind history
-fold your changes into it first (`gg sw`, `gg update`, `gg sync`, `gg amend`,
+fold your changes into it first (`gg br <name>`, `gg update`, `gg sync`, `gg amend`,
 `gg copy`, `gg uncommit`), and `gg push` refuses until you finish it with
 `gg c -m "msg"` or take it back with `gg uncommit`. `gg c` with no message
 refuses while in wip mode. There is no stash.
@@ -161,8 +161,8 @@ gg diff @na        resolves, then diffs
 ```
 
 When the commit is the tip of a local branch the branch name is used, so
-`gg sw @nan` switches to the branch rather than to a detached HEAD. Branch
-verbs (`gg br`, `gg sw`, `gg cbr`, `gg dbr`, `gg mg`) read a branch changeId
+`gg br @nan` switches to the branch rather than to a detached HEAD. Branch
+verbs (`gg br`, `gg cbr`, `gg dbr`, `gg mg`) read a branch changeId
 first, so `gg br 4d` names the branch even when another branch holds the same
 commit.
 

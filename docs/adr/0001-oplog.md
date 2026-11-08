@@ -50,7 +50,7 @@ The committer identity is the marker `gg oplog <gg-oplog@localhost>`. `p1` and `
 
 The worktree snapshot uses a temporary index at `<git-dir>/gg-tmp-index-<pid>-<counter>`. The name is unique per process and run, so two `gg` processes in one repository cannot clobber each other. The steps are `read-tree HEAD`, `add -A`, `write-tree`. The temporary index is removed after use. The real index and HEAD are not touched while recording. When the repository has no HEAD yet, the base is the empty tree from `git mktree`.
 
-`Record(verb)` captures the worktree tree and the refs snapshot, writes the refs text with `git hash-object -w --stdin`, and stores the blob sha in the `gg-refs:` trailer. The mutating set now also includes the verbs that move refs: `sw`, `cbr`, `dbr`, `delete-branch`, `mg`, `wt`, `re`, `raw`. `branch` is not in the set; `Branches` calls `oplog.Record("branch")` only when it creates or switches to a branch.
+`Record(verb)` captures the worktree tree and the refs snapshot, writes the refs text with `git hash-object -w --stdin`, and stores the blob sha in the `gg-refs:` trailer. The mutating set now also includes the verbs that move refs: `cbr`, `dbr`, `delete-branch`, `mg`, `wt`, `re`, `raw`. `branch` is not in the set; `Branches` calls `oplog.Record("branch")` only when it creates or switches to a branch.
 
 `Record(verb)` runs before every verb in the mutating set. The set is gated by `verbs.IsMutating`. The call sites are `execArgv` and `execFunc` in `main.go`, and also `execTool`. `Record` returns early when the current directory is not inside a repository.
 
