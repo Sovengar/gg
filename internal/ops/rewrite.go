@@ -69,7 +69,7 @@ func Amend(args []string) int {
 // Reword edits the message of one commit.
 func Reword(args []string) int {
 	if len(args) < 1 {
-		ui.Errf("gg reword <commit>")
+		ui.Errf("gg describe <commit>")
 		return 2
 	}
 	if !HistorySupported() {

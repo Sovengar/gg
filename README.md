@@ -47,7 +47,7 @@ gg clear           drop every edit and delete the new files (-f skips the questi
 gg new             save the changes, then absorb more until you commit
 gg amend           fold changes into HEAD
 gg amend <id>      fold changes into another commit (git history fixup)
-gg reword <id>     edit that commit's message (aliases: rename, describe, desc)
+gg describe <id>   edit that commit's message (aliases: reword, rename, desc)
 gg split <id> -- f cut that commit in two by paths (git history split, interactive)
 gg abandon <id>    drop that commit (git history drop)
 gg revert <id>     undo that commit with a new commit, safe once published (alias: rv)
@@ -75,7 +75,8 @@ gg oplog           the operations undo can reach
 gg oplog clear     drop the log, then git gc --prune=now frees the objects
 gg undo --force    undo even when it removes published commits
 gg help            compact verb table: canonical names per category, aliases under (alias: h)
-gg help -all       full table: description, hint and the git command per verb
+gg hh              the table with parameters and the flag variants
+gg hhh             full table: description, hint and the git command per verb
 gg tools           external tools + install state
 ```
 
@@ -85,13 +86,13 @@ Help is grouped by category: Inspection, Rollback work, Register work,
 Edit saved work, Branching, Operations, Remote, Forge, Tools, Others. There is no stash: the
 working tree, the index and wip commits are one mechanism (`gg new`, `gg wt`).
 `gg help` (or `gg h`) prints one line of names per category, then a grey line
-with that category's aliases, verb first: `reword -> rename, describe`. Both
+with that category's aliases, verb first: `describe -> reword, rename`. Both
 lines wrap at `COLUMNS`, 80 by default. A shorthand sits grey next to its verb,
-no parentheses: `reword desc`, `commit c`. A real alias goes on the arrow
+no parentheses: `describe desc`, `commit c`. A real alias goes on the arrow
 line.
-`gg help -p` lists the parameter hints and the flag variants, each variant named
+`gg hh` lists the parameter hints and the flag variants, each variant named
 with the command it stands for: `status -a sta`, `status -f stf`.
-`gg help --all` prints the full table: description, grey parameter hint and the
+`gg hhh` prints the full table: description, grey parameter hint and the
 git command behind each verb.
 
 Flags: `-p/--print`, `-n/--dry` print the resolved command instead of running.
@@ -286,10 +287,10 @@ and falls back to `git rebase --onto` for `abandon`:
 |---|---|
 | `gg abandon <id>` | `git history drop <id>` |
 | `gg amend <id>` | `git history fixup <id>` |
-| `gg reword <id>` | `git history reword <id>` |
+| `gg describe <id>` | `git history reword <id>` |
 | `gg split <id>` | `git history split <id>` |
 
-`reword` keeps the Change-Id trailer, so the changeId does not move when the
+`describe` keeps the Change-Id trailer, so the changeId does not move when the
 sha does.
 
 ### jj edit
