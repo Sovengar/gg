@@ -90,7 +90,7 @@ func TestSplitDisplay(t *testing.T) {
 		{"status (st, sta, stf)", "status", []string{"st", "sta", "stf"}},
 		{"branch -c (cbr)", "branch -c", []string{"cbr"}},
 		{"branch -d (dbr)", "branch -d", []string{"dbr"}},
-		{"branch -D", "branch -D", nil},
+		{"branch -D (Dbr)", "branch -D", []string{"Dbr"}},
 	}
 	for _, c := range cases {
 		name, aliases := splitDisplay(c.display)

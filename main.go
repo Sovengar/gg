@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"gg/internal/files"
 	"gg/internal/gitx"
@@ -41,6 +42,11 @@ func main() {
 }
 
 func run(argv []string) int {
+	// help parses its own flags: -p there means params, not print mode
+	if len(argv) > 0 && (argv[0] == "help" || argv[0] == "h") {
+		return help(argv[1:])
+	}
+
 	m, args := parseFlags(argv)
 	if len(args) == 0 {
 		args = []string{"dash"}
@@ -63,12 +69,6 @@ func run(argv []string) int {
 		return showIDs(args[1:])
 	case "__seq-edit":
 		return ops.SeqEdit(args[1:])
-	case "raw":
-		if len(args) < 2 {
-			ui.Errf("gg raw: nothing to run")
-			return 2
-		}
-		return execArgv(args[1:], "raw", m)
 	}
 
 	name := args[0]
@@ -224,7 +224,7 @@ func pathVerb(name string) bool { return pathVerbs[name] }
 var branchVerbs = map[string]bool{
 	"branch": true, "br": true, "branches": true,
 	"cbr": true,
-	"dbr": true, "delete-branch": true, "mg": true, "merge": true,
+	"dbr": true, "Dbr": true, "delete-branch": true, "mg": true, "merge": true,
 }
 
 func branchVerb(name string) bool { return branchVerbs[name] }
@@ -305,7 +305,8 @@ func execFunc(entry verbs.Entry, typed string, rest []string, m mode) int {
 	if entry.Name == "wt" && len(rest) > 0 && (rest[0] == "ls" || rest[0] == "list") {
 		return entry.Fn(rest)
 	}
-	if verbs.IsMutating(entry.Name) {
+	// a --check run only reports: no oplog entry, no footer
+	if verbs.IsMutating(entry.Name) && !reportsOnly(entry.Name, rest) {
 		oplog.Record(entry.Name)
 	}
 	if wipFold[entry.Name] {
@@ -315,8 +316,26 @@ func execFunc(entry verbs.Entry, typed string, rest []string, m mode) int {
 		ui.Errf("+ gg %s", strings.TrimSpace(typed+" "+quote(rest)))
 	}
 	rc := entry.Fn(rest)
-	footer(entry.Name)
+	if !reportsOnly(entry.Name, rest) {
+		footer(entry.Name)
+	}
 	return rc
+}
+
+// reportsOnly is a verb called in check mode: it reports, it changes nothing.
+// Only the verbs with a check flag read -c that way; elsewhere -c means create.
+func reportsOnly(verb string, rest []string) bool {
+	switch verb {
+	case "update", "up", "push", "p":
+	default:
+		return false
+	}
+	for _, a := range rest {
+		if a == "--check" || a == "-c" {
+			return true
+		}
+	}
+	return false
 }
 
 func execTool(entry verbs.Entry, rest []string, m mode) int {
@@ -325,7 +344,8 @@ func execTool(entry verbs.Entry, rest []string, m mode) int {
 		fmt.Println(quote(append([]string{entry.Tool}, argv...)))
 		return 0
 	}
-	if verbs.IsMutating(entry.Name) {
+	// a --check run only reports: no oplog entry, no footer
+	if verbs.IsMutating(entry.Name) && !reportsOnly(entry.Name, rest) {
 		oplog.Record(entry.Name)
 	}
 	if wipFold[entry.Name] {
@@ -383,11 +403,54 @@ func footer(verb string) {
 
 func help(argv []string) int {
 	for _, a := range argv {
-		if a == "-all" || a == "--all" {
+		switch a {
+		case "-all", "--all", "-a":
 			return helpAll()
+		case "-p", "--params":
+			return helpParams()
 		}
 	}
 	return helpCompact()
+}
+
+// helpParams lists each verb with its parameters: the hint and the variants.
+func helpParams() int {
+	entries := verbs.All()
+	nameWidth := 0
+	for _, e := range entries {
+		if e.Hidden || (e.Hint == "" && !e.Variant) {
+			continue
+		}
+		if n := len(e.Display()); n > nameWidth {
+			nameWidth = n
+		}
+	}
+	if nameWidth > 34 {
+		nameWidth = 34
+	}
+
+	category := ""
+	for _, e := range entries {
+		if e.Hidden || (e.Hint == "" && !e.Variant) {
+			continue
+		}
+		if e.Category != category {
+			if category != "" {
+				fmt.Println()
+			}
+			category = e.Category
+			fmt.Println(ui.Dim(category))
+		}
+		note := e.Hint
+		if note == "" && e.Variant {
+			note = "same verb, other flag"
+		}
+		fmt.Printf("  %s  %s\n", ui.Cyan(fmt.Sprintf("%-*s", nameWidth, e.Display())), ui.Dim(note))
+	}
+
+	fmt.Println()
+	fmt.Println(ui.Dim("  gg help --all  adds descriptions and the git command behind each verb"))
+	return 0
 }
 
 // helpCompact prints one line of canonical names per category, then one line of
@@ -397,8 +460,8 @@ func helpCompact() int {
 	names := make(map[string][]string)
 	aliases := make(map[string][]string)
 	for _, e := range verbs.All() {
-		if e.Hidden {
-			continue
+		if e.Hidden || e.Variant {
+			continue // variants carry a flag, they belong to gg help -p
 		}
 		if _, seen := names[e.Category]; !seen {
 			order = append(order, e.Category)
@@ -472,7 +535,7 @@ func wrapItems(items []string, width int) []string {
 		switch {
 		case line == "":
 			line = item
-		case len(line)+len(item)+3 <= width:
+		case utf8.RuneCountInString(line)+utf8.RuneCountInString(item)+3 <= width:
 			line += " · " + item
 		default:
 			lines = append(lines, line)

@@ -48,7 +48,7 @@ edit	fn:edit	stop a rebase at a commit	hint:Takes a changeId
 branch switch	fn:branches	change branch	hint:Takes a branch	display:branch (br)	displayonly
 cbr	switch -c	branch new and switch	hint:Takes a branch. branch new <name> works too	display:branch -c (cbr)
 dbr|delete-branch	fn:deleteBranch	delete a branch, tip kept in a ref	hint:Safe: unmerged commits stay. Takes a branch or a changeId	display:branch -d (dbr)
-branch -D	branch -D	delete a branch even when unmerged	hint:Force. Drops unmerged commits, keeps the tip ref	display:branch -D	variant	displayonly
+Dbr	fn:deleteBranchForce	delete a branch even when unmerged	hint:Force. Drops unmerged commits, keeps the tip ref	display:branch -D (Dbr)	variant
 mg	merge	merge a branch into this one	hint:Takes a branch
 wt	fn:wt	parallel branches, one worktree each	hint:Takes new|ls|rm
 

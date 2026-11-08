@@ -30,7 +30,8 @@ gg branch          branches sorted by recency (alias: br)
 gg br -r           remote branches only
 gg br -a           local and remote branches in one list
 gg branch -c side  create a branch and switch to it (alias: cbr; branch new works too)
-gg branch -d side  delete a branch, its tip kept in refs/gg/deleted (alias: dbr; -D forces)
+gg branch -d side  delete a branch, its tip kept in refs/gg/deleted (alias: dbr)
+gg branch -D side  force the delete, unmerged commits and all (alias: Dbr)
 gg reflog          reflog
 gg diff            diff in boxes, one per change (plain git diff when piped)
 gg diff -w         diff ignoring whitespace

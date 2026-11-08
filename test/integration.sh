@@ -636,6 +636,9 @@ git branch unmerged side >/dev/null 2>&1
 if "$BIN" br -d unmerged >/dev/null 2>&1; then no "br -d refuses unmerged work"; else ok "br -d refuses unmerged work"; fi
 "$BIN" br -D unmerged >/dev/null 2>&1
 assert_eq "br -D forces the delete" "$(git for-each-ref refs/heads/unmerged --format='%(refname:short)')" ""
+git branch forced side >/dev/null 2>&1
+"$BIN" Dbr forced >/dev/null 2>&1
+assert_eq "Dbr forces the delete" "$(git for-each-ref refs/heads/forced --format='%(refname:short)')" ""
 if "$BIN" dbr tb >/dev/null 2>&1; then no "dbr refuses the current branch"; else ok "dbr refuses the current branch"; fi
 
 echo "branch changeIds stay apart on one commit"

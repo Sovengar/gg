@@ -2,6 +2,7 @@
 package ops
 
 import (
+	"fmt"
 	"os"
 	"strings"
 
@@ -11,10 +12,36 @@ import (
 
 // Update fetches every remote and rebases the current branch on its upstream.
 func Update(args []string) int {
+	check := false
+	if len(args) > 0 && (args[0] == "--check" || args[0] == "-c") {
+		check = true
+		args = args[1:]
+	}
 	if rc := gitx.Run("fetch", "--prune", "--all"); rc != 0 {
 		return rc
 	}
+	if check {
+		return updateCheck()
+	}
 	return gitx.Run(append([]string{"pull", "--rebase", "--autostash"}, args...)...)
+}
+
+// updateCheck reports what update would do, the way but pull --check does:
+// how far the upstream is, and whether the rebase replays without conflict.
+func updateCheck() int {
+	up, ok := gitx.Upstream()
+	if !ok {
+		ui.Errf("gg update --check: this branch has no upstream")
+		return 1
+	}
+	behind, _ := gitx.Count("HEAD.." + up)
+	ahead, _ := gitx.Count(up + "..HEAD")
+	state := ui.Green("clean")
+	if _, err := gitx.Output("merge-tree", "--write-tree", "HEAD", up); err != nil {
+		state = ui.Red("conflicts")
+	}
+	fmt.Printf("  %s  %d behind · %d ahead   rebase: %s\n", up, behind, ahead, state)
+	return 0
 }
 
 // Sync rebases the current branch onto a named remote branch, then publishes it.
