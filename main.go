@@ -224,7 +224,7 @@ func pathVerb(name string) bool { return pathVerbs[name] }
 var branchVerbs = map[string]bool{
 	"branch": true, "br": true, "branches": true,
 	"cbr": true,
-	"dbr": true, "Dbr": true, "delete-branch": true, "mg": true, "merge": true,
+	"dbr": true, "Dbr": true, "mg": true, "merge": true,
 }
 
 func branchVerb(name string) bool { return branchVerbs[name] }
