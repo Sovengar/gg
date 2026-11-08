@@ -75,3 +75,24 @@ func TestToolEntries(t *testing.T) {
 		t.Errorf("describe = %q", got)
 	}
 }
+
+func TestPRVerbsRegistered(t *testing.T) {
+	for _, name := range []string{"pr", "rpr", "epr"} {
+		e, ok := Lookup(name)
+		if !ok || !e.IsFunc() || e.Fn == nil {
+			t.Errorf("%s should be a Go function", name)
+		}
+	}
+	for _, name := range []string{"pr", "rpr", "epr"} {
+		if !IsMutating(name) {
+			t.Errorf("%s should be mutating", name)
+		}
+	}
+	// the raw reset verb is gone: it must not dispatch to an entry of its own
+	if _, ok := Lookup("re"); ok {
+		t.Error("re should no longer be a verb")
+	}
+	if IsMutating("re") {
+		t.Error("re should no longer be mutating")
+	}
+}

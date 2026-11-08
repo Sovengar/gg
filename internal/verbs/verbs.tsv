@@ -62,12 +62,16 @@ continue	fn:continue	resume a stopped rebase
 abort	fn:abort	abort whichever operation is stuck
 redo	fn:redo	step forward again after an undo
 oplog	fn:oplog	the operations undo can reach	hint:Takes clear to drop the log
-re	reset	move HEAD	hint:Takes a ref
 
 # --- Remote ---
 update|up	fn:update	fetch and rebase on the upstream	hint:--check fetches, then reports without rebasing
 push|p	fn:push	push, refuse on drift
 sync	fn:sync	rebase on a branch, then push	hint:Takes a branch
+
+# --- Forge ---
+pr	fn:prNew	create a PR for this branch	hint:-d drafts. A stacked branch bases on its parent
+rpr	fn:prReview	review a PR in its own worktree	hint:Takes a number	display:pr review rpr	variant
+epr	fn:prReviewEdit	review a PR with its diff live	hint:Takes a number. Soft reset on the base	display:pr review -e epr	variant
 
 # --- Tools ---
 story	tool:gitlogue	animated history replay

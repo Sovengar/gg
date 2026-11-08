@@ -251,6 +251,7 @@ var removed = map[string]string{
 // noResolve are verbs whose arguments are not changeIDs.
 var noResolve = map[string]bool{
 	"undo": true, "redo": true, "oplog": true,
+	"pr": true, "rpr": true, "epr": true,
 }
 
 // wipFold lists the verbs that fold uncommitted edits into an active wip

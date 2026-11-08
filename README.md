@@ -56,6 +56,10 @@ gg wt new side     a worktree for a branch, one directory each
 gg wt ls           each worktree, its path and how dirty it is
 gg wt rm side      remove it, --force when dirty
 gg absorb          git absorb
+gg pr              open a PR for this branch; a stacked branch bases on its parent
+gg pr -d           the same, as a draft (extra args go to gh verbatim)
+gg pr review 42    mount that PR in its own worktree, commits intact (alias: rpr)
+gg pr review 42 edit  the same, with the PR diff live in the tree (alias: epr)
 gg fetch           plain git fetch: fetch.all and fetch.prune decide the scope
 gg update / gg up  fetch --prune --all + pull --rebase --autostash
 gg push / gg p     push, refuse on drift, offer force-with-lease
@@ -76,7 +80,7 @@ gg tools           external tools + install state
 Unknown verbs go straight to git: `gg log --oneline -5` runs `git log --oneline -5`.
 
 Help is grouped by category: Inspection, Rollback work, Register work,
-Edit saved work, Branching, Operations, Remote, Tools, Others. There is no stash: the
+Edit saved work, Branching, Operations, Remote, Forge, Tools, Others. There is no stash: the
 working tree, the index and wip commits are one mechanism (`gg new`, `gg wt`).
 `gg help` (or `gg h`) prints one line of names per category, then a grey `aka`
 line with that category's aliases, so the whole table stays on screen. Both
