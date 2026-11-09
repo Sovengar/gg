@@ -65,6 +65,7 @@ gg rebase <base>   replay the branch onto another base (alias: rb); -i keeps wor
 gg wt new side     a worktree for a branch, one directory each
 gg wt ls           each worktree, its path and how dirty it is
 gg wt rm side      remove it, --force when dirty
+gg merge <branch>  merge it, fast-forward only; --no-ff keeps a merge commit
 gg conflict/cf     git mergetool: resolve conflicts with the configured tool
 gg absorb          git absorb
 gg pr              open a PR for this branch; a stacked branch bases on its parent
@@ -202,7 +203,7 @@ gg diff @na        resolves, then diffs
 
 When the commit is the tip of a local branch the branch name is used, so
 `gg br @nan` switches to the branch rather than to a detached HEAD. Branch
-verbs (`gg br`, `gg cbr`, `gg dbr`, `gg mg`, `gg rb`) read a branch changeId
+verbs (`gg br`, `gg cbr`, `gg dbr`, `gg merge`, `gg rb`) read a branch changeId
 first, so `gg br 4d` names the branch even when another branch holds the same
 commit.
 

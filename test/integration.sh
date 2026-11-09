@@ -1162,6 +1162,37 @@ assert_eq "land refuses a branch that is not ahead" "$rc" "1"
 assert_contains "land points at gg pr" "$out" "gg pr"
 assert_contains "hh lists land" "$("$BIN" hh)" "land"
 
+echo "merge is fast-forward only"
+R=$(newrepo)
+cd "$R" || exit 1
+git switch -qc topic
+git commit -q --allow-empty -m topic
+git switch -q tb
+git commit -q --allow-empty -m main
+out=$("$BIN" mg topic 2>&1)
+rc=$?
+assert_eq "mg refuses a merge commit by default" "$rc" "1"
+assert_contains "mg says nothing merged" "$out" "not a fast-forward"
+assert_contains "mg points at --no-ff" "$out" "--no-ff"
+assert_eq "the refused merge left HEAD alone" "$(git log --format=%s -1)" "main"
+"$BIN" mg --no-ff topic >/dev/null 2>&1
+assert_eq "mg --no-ff keeps a merge commit" "$(git rev-list --parents -1 HEAD | wc -w | tr -d ' ')" "3"
+git reset -q --hard HEAD~1
+git config merge.ff false
+"$BIN" mg topic >/dev/null 2>&1
+assert_eq "merge.ff decides when it is set" "$(git rev-list --parents -1 HEAD | wc -w | tr -d ' ')" "3"
+git config --unset merge.ff
+
+R=$(newrepo)
+cd "$R" || exit 1
+git switch -qc topic
+git commit -q --allow-empty -m topic
+git switch -q tb
+"$BIN" mg topic >/dev/null 2>&1
+assert_eq "mg fast-forwards when it can" "$(git rev-list --count HEAD)" "2"
+assert_eq "mg made no merge commit" "$(git rev-list --parents -1 HEAD | wc -w | tr -d ' ')" "2"
+assert_contains "hh hints the fast-forward default" "$("$BIN" hh -v)" "Fast-forward"
+
 echo "rebase"
 R=$(newrepo)
 cd "$R" || exit 1

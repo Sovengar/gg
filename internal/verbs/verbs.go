@@ -82,6 +82,7 @@ var functions = map[string]func([]string) int{
 	"prReview":     ops.PRReview,
 	"prReviewEdit": ops.PRReviewEdit,
 	"land":         ops.Land,
+	"merge":        ops.Merge,
 	"new":          ops.New,
 	"commit":       ops.Commit,
 	"commitExclude": func(args []string) int {
@@ -142,7 +143,7 @@ var mutating = map[string]bool{
 	"revert": true, "rv": true,
 	"reword": true, "rename": true, "describe": true, "desc": true,
 	"cbr": true, "dbr": true,
-	"mg": true, "wt": true,
+	"mg": true, "wt": true, "merge": true,
 	"pr": true, "rpr": true, "epr": true, "land": true,
 }
 
