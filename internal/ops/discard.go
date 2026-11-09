@@ -15,9 +15,16 @@ import (
 // changeId cannot be confused; a plain name is sorted here.
 func Discard(args []string) int {
 	force, yes, remote := false, false, false
+	stop := false
 	var items []string
 	for _, a := range args {
+		if stop {
+			items = append(items, a)
+			continue
+		}
 		switch a {
+		case "--":
+			stop = true
 		case "-a", "--all":
 			ui.Errf("gg discard: no -a. A bare discard drops every edit already.")
 			return 2
@@ -101,10 +108,25 @@ func discardKind(item string) (string, string) {
 	if branchExists(item) {
 		return "branch", item
 	}
-	if revExists(item) {
+	// only a sha is a commit here: a tag or HEAD is not a changeId, and a typo
+	// must not become a dropped commit
+	if isSha(item) && revExists(item) {
 		return "commit", item
 	}
 	return "path", item
+}
+
+// isSha reports whether the token looks like a commit object name.
+func isSha(token string) bool {
+	if len(token) < 7 || len(token) > 40 {
+		return false
+	}
+	for _, r := range token {
+		if (r < '0' || r > '9') && (r < 'a' || r > 'f') && (r < 'A' || r > 'F') {
+			return false
+		}
+	}
+	return true
 }
 
 // discardPaths drops the edits of the named tracked paths and leaves the rest
