@@ -35,8 +35,8 @@ gg br -a           the stacks: each branch under the one it was cut from
 gg br -la          local and remote branches in one list
 gg br -lm          branches already merged into HEAD (br -lm main: into main)
 gg branch -c side  create a branch and switch to it (alias: cbr; branch new works too)
-gg branch -d side  delete a branch, its tip kept in refs/gg/deleted (alias: dbr)
-gg branch -D side  force the delete, unmerged commits and all (alias: Dbr)
+gg reap side       delete a branch, its tip kept in refs/gg/deleted
+gg reap side -D    force the delete, unmerged commits and all
 gg reflog          reflog
 gg tag             tags newest version first, with the message (alias: t)
 gg tag -m v1.2.0   create one; -d deletes, -s signs
@@ -106,7 +106,7 @@ shorthand sits grey next to its verb, no parentheses: `describe desc`,
 `commit c`. A real alias goes on the footer arrow line.
 `gg hh` merges each flag variant into the cell of the verb it flags, name and
 flag together: `status st, -a sta, -f stf`, `branch br, -r, -a, -g, -c
-cbr, -d dbr, -D Dbr`. A variant lives on one row, its parameters in `hh -v`,
+cbr`. A variant lives on one row, its parameters in `hh -v`,
 and a positional row with no flag of its own (`branch <name>`) stays there.
 `gg h -v` prints one row per verb with its description, no parameters.
 `gg hh -v` prints one row per verb and flag variant, with the grey parameter
@@ -149,7 +149,7 @@ refuses when nobody can answer.
 
 `gg new` turns the working tree into a commit on the current branch. While that
 commit is HEAD, `gg dash` prints a `wip` badge, the verbs that rewind history
-fold your changes into it first (`gg br <name>`, `gg update`, `gg sync`, `gg amend`,
+fold your changes into it first (`gg go <name>`, `gg update`, `gg sync`, `gg amend`,
 `gg copy`, `gg uncommit`), and `gg push` refuses until you finish it with
 `gg c -m "msg"` or take it back with `gg uncommit`. `gg c` with no message
 refuses while in wip mode. There is no stash.
@@ -171,6 +171,7 @@ Work that must not share a checkout goes to its own worktree:
 gg wt new side     sibling directory <repo>.side on branch side; folds wip first
 gg wt ls           branch, path, and how dirty each worktree is
 gg wt rm side      remove it; --force when it is dirty
+gg go side         go where it lives: its worktree, or this checkout
 gg fork side       the same directory, under the verb the table uses (alias: fk)
 gg ship side       squash the branch into one commit on the target, drop its worktree
 gg reap side       remove the worktree; -k keeps the branch, -d deletes it
@@ -194,6 +195,22 @@ target and pushes, and it keeps the commits. `gg pr` is the review path.
 gg ship side       squash side into one commit on the default branch
 gg ship side -m "feat: side work"   name the message when it holds several commits
 ```
+
+`gg go <branch>` walks to where a branch lives: its worktree when one holds it,
+and this checkout when none does. A branch that does not exist yet is created,
+and gg asks whether it should live in its own worktree. `gg go <branch> -- cmd`
+runs the command inside that directory instead, which is what an agent needs.
+
+A program cannot change the shell that started it, so `gg go` prints the
+directory. `gg shell install` writes the fish function that cds there:
+
+```
+gg shell install    library function in ~/.config/fish/functions/gg.fish
+gg shell show       where it is, or that it is missing
+gg shell uninstall  remove it
+```
+
+Without the wrapper, `cd (gg go side)` does the same thing.
 
 `gg reap` is the only verb that removes a worktree. A branch that still has one
 gets a question: keep the branch or delete it too. When origin holds the branch,
@@ -240,13 +257,13 @@ gg diff @na        resolves, then diffs
 
 When the commit is the tip of a local branch the branch name is used, so
 `gg br @nan` switches to the branch rather than to a detached HEAD. Branch
-verbs (`gg br`, `gg cbr`, `gg dbr`, `gg merge`, `gg rb`) read a branch changeId
+verbs (`gg go`, `gg br`, `gg cbr`, `gg reap`, `gg merge`, `gg rb`) read a branch changeId
 first, so `gg br 4d` names the branch even when another branch holds the same
 commit.
 
 ### Branch list after a delete
 
-`gg dbr` ends with the branch list it just changed: the five newest branches
+`gg reap` ends with the branch list it just changed: the five newest branches
 and the default branch, always. The default branch is the one `origin/HEAD`
 points at, else `main`, `master`, `trunk` or `develop`, else the current branch.
 

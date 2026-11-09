@@ -227,9 +227,9 @@ func pathVerb(name string) bool { return pathVerbs[name] }
 var branchVerbs = map[string]bool{
 	"branch": true, "br": true, "branches": true,
 	"cbr": true,
-	"dbr": true, "Dbr": true, "mg": true, "merge": true,
+	"mg":  true, "merge": true,
 	"rebase": true, "rb": true,
-	"land": true,
+	"land": true, "reap": true, "ship": true,
 }
 
 func branchVerb(name string) bool { return branchVerbs[name] }
@@ -245,8 +245,10 @@ func newSubcommand(name string) bool { return newSubcommandVerbs[name] }
 // removed verbs name the verb that took their work, so an old habit fails with
 // a direction instead of a git error.
 var removed = map[string]string{
-	"sw":     "Use gg br <name> to switch, or gg cbr <name> to create and switch.",
-	"switch": "Use gg br <name> to switch, or gg cbr <name> to create and switch.",
+	"sw":     "Use gg go <name> to reach a branch, or gg cbr <name> to create and switch.",
+	"switch": "Use gg go <name> to reach a branch, or gg cbr <name> to create and switch.",
+	"dbr":    "Use gg reap <branch>, which drops its worktree too.",
+	"Dbr":    "Use gg reap <branch> --force, which drops unmerged commits and the worktree.",
 	"cl-wd":  "Use gg discard to drop edits, and gg clear to delete new files.",
 	"cl-sa":  "It took the index. Use gg discard or gg clear.",
 	"us":     "It took the index. Use gg discard or gg clear.",

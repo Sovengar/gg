@@ -62,9 +62,9 @@ assert_lacks "help has no branches alias" "$out" "branches"
 assert_contains "help names the aliases verb first" "$out" "describe -> reword, rename"
 assert_contains "help keeps variants off the canonical line" "$(NO_COLOR=1 "$BIN" help | grep Inspection)" "branch br"
 assert_contains "hh merges the status variants into one cell" "$("$BIN" hh)" "status st, -a sta, -f stf"
-assert_contains "hh merges the branch variants" "$("$BIN" hh)" "branch br, -lr, -a, -la, -lm, -c cbr, -d dbr, -D Dbr"
+assert_contains "hh merges the branch variants" "$("$BIN" hh)" "branch br, -lr, -a, -la, -lm, -c cbr"
 assert_lacks "hh drops the positional branch row" "$("$BIN" hh)" "<name>"
-assert_contains "hh -v keeps the positional branch row" "$("$BIN" hh -v)" "branch <name>"
+assert_contains "hh -v lists the go verb" "$("$BIN" hh -v)" "asks about a worktree"
 assert_contains "hh merges the commit variant" "$("$BIN" hh)" "commit c, -e ce"
 assert_contains "hh keeps the aliases" "$("$BIN" hh)" "describe -> reword, rename"
 assert_contains "hh -v names the short status form" "$("$BIN" hh -v)" "status -a sta"
@@ -786,6 +786,24 @@ git branch swept main
 assert_contains "reap --merged lists the sweep" "$("$BIN" reap --merged -y 2>&1)" "swept"
 if git rev-parse --verify --quiet refs/heads/swept >/dev/null; then no "reap --merged deletes it"; else ok "reap --merged deletes it"; fi
 
+echo "go and the fish wrapper"
+R=$(mktemp -d)
+(cd "$R" && git init -q -b main . && git commit -q --allow-empty -m init)
+cd "$R" || exit 1
+git branch side >/dev/null 2>&1
+"$BIN" fork side >/dev/null 2>&1
+side="$(dirname "$R")/$(basename "$R").side"
+assert_eq "go prints the worktree path" "$("$BIN" go side 2>/dev/null)" "$side"
+assert_eq "go runs a command in the worktree" "$("$BIN" go side -- pwd 2>/dev/null)" "$side"
+assert_eq "go prints the checkout when no worktree holds the branch" "$("$BIN" go main 2>/dev/null)" "$R"
+git branch fresh >/dev/null 2>&1
+"$BIN" go fresh </dev/null >/dev/null 2>&1
+assert_eq "go switches a branch that has no worktree" "$(git rev-parse --abbrev-ref HEAD)" "fresh"
+assert_contains "go asks about a worktree for a missing branch" "$("$BIN" go brand-new 2>&1 </dev/null)" "own worktree"
+assert_eq "go creates the missing branch in place" "$(git rev-parse --abbrev-ref HEAD)" "brand-new"
+assert_contains "shell reports its state" "$("$BIN" shell 2>&1)" "gg shell:"
+assert_contains "shell takes a subcommand" "$("$BIN" shell bogus 2>&1)" "install, uninstall or show"
+
 echo "the wip fold waits for a stopped operation"
 R=$(newrepo)
 cd "$R" || exit 1
@@ -930,20 +948,27 @@ assert_eq "branch -c creates and switches" "$(git rev-parse --abbrev-ref HEAD)" 
 "$BIN" branch new oldform >/dev/null 2>&1
 assert_eq "branch new still creates" "$(git rev-parse --abbrev-ref HEAD)" "oldform"
 "$BIN" br tb >/dev/null 2>&1
-recent=$(NO_COLOR=1 "$BIN" dbr side 2>/dev/null)
-assert_eq "dbr deletes a merged branch" "$(git for-each-ref refs/heads/side --format='%(refname:short)')" ""
-assert_eq "dbr keeps a backup ref" "$(git for-each-ref refs/gg/deleted/side --format='%(refname)')" "refs/gg/deleted/side"
-assert_contains "dbr lists the newest branches" "$recent" "branches (5 newest"
-assert_contains "dbr keeps the default branch in view" "$recent" "tb"
-assert_eq "dbr lists a branch once" "$(printf '%s\n' "$recent" | grep -c tb)" "1"
+recent=$(NO_COLOR=1 "$BIN" reap side 2>/dev/null)
+assert_eq "reap deletes a merged branch" "$(git for-each-ref refs/heads/side --format='%(refname:short)')" ""
+assert_eq "reap keeps a backup ref" "$(git for-each-ref refs/gg/deleted/side --format='%(refname)')" "refs/gg/deleted/side"
+assert_contains "reap lists the newest branches" "$recent" "branches (5 newest"
+assert_contains "reap keeps the default branch in view" "$recent" "tb"
+assert_eq "reap lists a branch once" "$(printf '%s\n' "$recent" | grep -c tb)" "1"
+git branch multi1 >/dev/null 2>&1
+git branch multi2 >/dev/null 2>&1
+"$BIN" reap multi1 multi2 >/dev/null 2>&1
+assert_eq "reap deletes several names at once" "$(git for-each-ref refs/heads/multi1 refs/heads/multi2 --format='%(refname:short)' | wc -l | tr -d ' ')" "0"
 git branch unmerged side >/dev/null 2>&1
-if "$BIN" br -d unmerged >/dev/null 2>&1; then no "br -d refuses unmerged work"; else ok "br -d refuses unmerged work"; fi
-"$BIN" br -D unmerged >/dev/null 2>&1
-assert_eq "br -D forces the delete" "$(git for-each-ref refs/heads/unmerged --format='%(refname:short)')" ""
+if "$BIN" reap unmerged >/dev/null 2>&1; then no "reap refuses unmerged work"; else ok "reap refuses unmerged work"; fi
+"$BIN" reap unmerged -D >/dev/null 2>&1
+assert_eq "reap -D forces the delete" "$(git for-each-ref refs/heads/unmerged --format='%(refname:short)')" ""
 git branch forced side >/dev/null 2>&1
-"$BIN" Dbr forced >/dev/null 2>&1
-assert_eq "Dbr forces the delete" "$(git for-each-ref refs/heads/forced --format='%(refname:short)')" ""
-if "$BIN" dbr tb >/dev/null 2>&1; then no "dbr refuses the current branch"; else ok "dbr refuses the current branch"; fi
+"$BIN" reap forced -D >/dev/null 2>&1
+assert_eq "reap -D drops unmerged commits" "$(git for-each-ref refs/heads/forced --format='%(refname:short)')" ""
+if "$BIN" reap tb >/dev/null 2>&1; then no "reap refuses the current branch"; else ok "reap refuses the current branch"; fi
+assert_contains "dbr is gone with a direction" "$("$BIN" dbr side 2>&1)" "gg reap"
+assert_contains "Dbr is gone with a direction" "$("$BIN" Dbr side 2>&1)" "gg reap"
+assert_contains "branch -d is gone with a direction" "$("$BIN" br -d side 2>&1)" "gg reap"
 
 echo "branch stacks"
 R=$(newrepo)
@@ -1025,8 +1050,8 @@ R=$(newrepo)
 cd "$R" || exit 1
 git branch gone
 gone_sha=$(git rev-parse refs/heads/gone)
-"$BIN" dbr gone >/dev/null 2>&1
-assert_eq "dbr removed the branch" "$(git for-each-ref refs/heads/gone --format='%(refname)')" ""
+"$BIN" reap gone >/dev/null 2>&1
+assert_eq "reap removed the branch" "$(git for-each-ref refs/heads/gone --format='%(refname)')" ""
 "$BIN" undo >/dev/null 2>&1
 assert_eq "undo restores a deleted branch at the same sha" "$(git rev-parse refs/heads/gone)" "$gone_sha"
 assert_contains "undo lists the restored branch" "$(git branch --format='%(refname:short)')" "gone"

@@ -315,7 +315,7 @@ func TestRestoreRecreatesDeletedBranch(t *testing.T) {
 
 	git(t, dir, "branch", "side")
 	sha := git(t, dir, "rev-parse", "refs/heads/side")
-	Record("dbr")
+	Record("reap")
 	git(t, dir, "branch", "-D", "side")
 
 	if rc := Undo(1); rc != 0 {
