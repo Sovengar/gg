@@ -71,9 +71,23 @@ func Land(args []string) int {
 		ui.Errf("gg land: %s is already landed on %s", branch, remoteRef)
 		return 0
 	}
+	children := stackedChildren(branch, target)
+	// a child landed first already carries the branch into the target, so the
+	// branch itself has nothing left to publish
+	if len(children) > 0 && gitx.Run("merge-base", "--is-ancestor", "refs/heads/"+branch, remoteRef) == 0 {
+		ui.Errf("gg land: %s is already landed on %s, carried by %s",
+			branch, remoteRef, strings.Join(children, ", "))
+		return 0
+	}
 	if rc := gitx.Run("merge-base", "--is-ancestor", remoteRef, "refs/heads/"+branch); rc != 0 {
 		ui.Errf("gg land: %s is not ahead of %s, so it cannot fast-forward.", branch, remoteRef)
 		ui.Errf("gg land: gg pr opens a pull request instead, with review and CI.")
+		return 1
+	}
+	if kids := unlandedChildren(children, remoteRef); len(kids) > 0 {
+		ui.Errf("gg land: %s has stacked branches on top: %s", branch, strings.Join(kids, ", "))
+		ui.Errf("gg land: land the children first, leaf to root, so the base publishes last.")
+		ui.Errf("gg land: to drop one instead, gg discard branch:%s", kids[0])
 		return 1
 	}
 	if !yes && !landConfirm(branch, remoteRef) {
@@ -91,6 +105,46 @@ func Land(args []string) int {
 		ui.Errf("gg land: %s", note)
 	}
 	return 0
+}
+
+// stackedChildren names the branches stacked directly on top of branch. The
+// parent is derived, so this reads the same stack gg br -a draws, and the
+// target itself never counts as a child.
+func stackedChildren(branch, target string) []string {
+	rows := branchRows()
+	if len(rows) == 0 {
+		return nil
+	}
+	nodes := stackNodes(rows, ConventionBranch())
+	kids := make([]string, 0)
+	for _, r := range rows {
+		if r.name == branch || r.name == target {
+			continue
+		}
+		if nodes[r.name].parent == branch {
+			kids = append(kids, r.name)
+		}
+	}
+	return kids
+}
+
+// unlandedChildren keeps the children whose tips the target does not hold yet.
+// Landing a base while a child still stands on it publishes a base the stack is
+// about to move, so the stack lands leaf first. A child the target already
+// holds no longer blocks: the base came with it.
+func unlandedChildren(kids []string, remoteRef string) []string {
+	out := make([]string, 0, len(kids))
+	for _, name := range kids {
+		sha, err := gitx.Output("rev-parse", "--verify", "--quiet", "refs/heads/"+name)
+		if err != nil {
+			continue
+		}
+		if rc := gitx.Run("merge-base", "--is-ancestor", sha, remoteRef); rc == 0 {
+			continue
+		}
+		out = append(out, name)
+	}
+	return out
 }
 
 // landArgs reads the branch, the target and the accept flag. A branch is

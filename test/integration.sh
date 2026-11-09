@@ -1182,6 +1182,30 @@ assert_eq "land refuses a branch that is not ahead" "$rc" "1"
 assert_contains "land points at gg pr" "$out" "gg pr"
 assert_contains "hh lists land" "$("$BIN" hh)" "land"
 
+echo "land refuses a base with a stacked child"
+BARE=$(mktemp -d)/stack.git
+git init -q --bare -b main "$BARE"
+R=$(mktemp -d)
+git clone -q "$BARE" "$R" 2>/dev/null
+cd "$R" || exit 1
+git config user.email land@x
+git config user.name land
+git commit -q --allow-empty -m init
+git push -q -u origin main
+git switch -qc base
+git commit -q --allow-empty -m base
+git switch -qc child
+git commit -q --allow-empty -m child
+out=$("$BIN" land base -y 2>&1)
+rc=$?
+assert_eq "land refuses a stacked base" "$rc" "1"
+assert_contains "land names the child on top" "$out" "stacked branches on top: child"
+assert_eq "the refused stacked land pushed nothing" "$(git --git-dir="$BARE" rev-parse main)" "$(git rev-parse origin/main)"
+out=$("$BIN" land child -y 2>&1)
+assert_contains "the child lands" "$out" "landed child onto origin/main"
+out=$("$BIN" land base -y 2>&1)
+assert_contains "the base landed with the child" "$out" "already landed"
+
 echo "merge is fast-forward only"
 R=$(newrepo)
 cd "$R" || exit 1
