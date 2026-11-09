@@ -85,6 +85,10 @@ func Ship(args []string) int {
 		ui.Errf("gg ship: %s holds %s; ship from there, or switch this worktree to %s", holder, target, target)
 		return 1
 	}
+	if cur == target && gitx.Dirty() {
+		ui.Errf("gg ship: this worktree holds %s and has uncommitted changes. Commit or discard them first.", target)
+		return 1
+	}
 
 	wt, hasWt := findWorktree(worktrees(), branch)
 	if hasWt {
@@ -115,19 +119,28 @@ func Ship(args []string) int {
 	if rc := gitx.Run("update-ref", "-m", "gg ship", "refs/heads/"+branch, newSha, old); rc != 0 {
 		return rc
 	}
-	if note := ffTarget(target, newSha); note != "" {
-		ui.Errf("gg ship: %s", note)
+	if cur == branch {
+		// the ref moved under this checkout: bring the index and the tree with it
+		if rc := gitx.Run("reset", "--hard", "--quiet", newSha); rc != 0 {
+			return rc
+		}
 	}
+	moved, note := ffTarget(target, newSha)
+	ui.Errf("gg ship: %s", note)
 	if hasWt {
 		if cur, ok := repoRoot(); ok && cur == wt.path {
-			ui.Errf("gg ship: %s stays; run gg reap %s from another worktree to remove it", wt.path, branch)
+			ui.Errf("gg ship: %s stays; run gg discard %s from another worktree to remove it", wt.path, branch)
 		} else if rc := gitx.Run("worktree", "remove", "--force", wt.path); rc != 0 {
 			return rc
 		} else {
 			ui.Errf("gg ship: removed %s", wt.path)
 		}
 	}
-	ui.Errf("gg ship: %s is one commit on %s: %s", branch, target, abbrev(newSha))
+	if moved {
+		ui.Errf("gg ship: %s is one commit on %s: %s", branch, target, abbrev(newSha))
+	} else {
+		ui.Errf("gg ship: %s is one commit at %s; %s did not move", branch, abbrev(newSha), target)
+	}
 	return 0
 }
 
@@ -183,16 +196,16 @@ func shipConfirm(branch, target string, commits int) bool {
 // ffTarget moves the local target onto sha. It merges when the target is the
 // current branch, moves the ref when nothing holds it, and reports when another
 // worktree owns it.
-func ffTarget(target, sha string) string {
+func ffTarget(target, sha string) (bool, string) {
 	cur, _ := gitx.Output("rev-parse", "--abbrev-ref", "HEAD")
 	if cur == target {
 		if rc := gitx.Run("merge", "--ff-only", "--quiet", sha); rc != 0 {
-			return fmt.Sprintf("local %s did not fast-forward", target)
+			return false, fmt.Sprintf("local %s did not fast-forward", target)
 		}
-		return fmt.Sprintf("local %s moved to %s", target, abbrev(sha))
+		return true, fmt.Sprintf("local %s moved to %s", target, abbrev(sha))
 	}
 	if rc := gitx.Run("update-ref", "-m", "gg ship", "refs/heads/"+target, sha); rc != 0 {
-		return fmt.Sprintf("local %s stays behind", target)
+		return false, fmt.Sprintf("local %s stays behind", target)
 	}
-	return fmt.Sprintf("local %s moved to %s", target, abbrev(sha))
+	return true, fmt.Sprintf("local %s moved to %s", target, abbrev(sha))
 }

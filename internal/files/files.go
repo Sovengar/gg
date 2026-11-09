@@ -18,13 +18,14 @@ const (
 
 // Index maps changeIDs to paths for the current working tree.
 type Index struct {
-	changeIDs map[string]string // path -> changeId
-	byToken   map[string]string // unique token -> path
+	changeIDs map[string]string   // path -> changeId
+	byToken   map[string]string   // unique token -> path
+	ambig     map[string][]string // token shared by several paths
 }
 
 // Load reads the dirty paths once.
 func Load() *Index {
-	ix := &Index{changeIDs: map[string]string{}, byToken: map[string]string{}}
+	ix := &Index{changeIDs: map[string]string{}, byToken: map[string]string{}, ambig: map[string][]string{}}
 
 	lines, err := gitx.OutputAll("status", "--short", "--untracked-files=all")
 	if err != nil {
@@ -50,6 +51,9 @@ func Load() *Index {
 	}
 	for token, ps := range owners {
 		if len(ps) != 1 {
+			sorted := append([]string(nil), ps...)
+			sort.Strings(sorted)
+			ix.ambig[token] = sorted
 			continue
 		}
 		ix.byToken[token] = ps[0]
@@ -68,6 +72,11 @@ func (ix *Index) ChangeID(path string) string { return ix.changeIDs[path] }
 func (ix *Index) Resolve(token string) (string, bool) {
 	p, ok := ix.byToken[token]
 	return p, ok
+}
+
+// Ambiguous lists the paths a token could name, when there is more than one.
+func (ix *Index) Ambiguous(token string) []string {
+	return ix.ambig[token]
 }
 
 // Display is the changeId plus the path.

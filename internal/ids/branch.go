@@ -70,6 +70,11 @@ func (ix *BranchIndex) ChangeID(name string) string {
 	return RawChangeID("branch:" + name)
 }
 
+// Ambiguous lists the branches a token could name, when there are several.
+func (ix *BranchIndex) Ambiguous(token string) []string {
+	return ix.ambig[token]
+}
+
 // Resolve turns a two to four character token into a branch name.
 func (ix *BranchIndex) Resolve(token string) (string, Status) {
 	if !Shaped(token) {

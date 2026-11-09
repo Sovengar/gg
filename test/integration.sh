@@ -786,6 +786,33 @@ if [ -d "$other" ]; then no "discard -y removes the worktree"; else ok "discard 
 if git rev-parse --verify --quiet refs/heads/other >/dev/null; then no "discard -y deletes the branch"; else ok "discard -y deletes the branch"; fi
 if git rev-parse --verify --quiet refs/gg/deleted/other >/dev/null; then ok "discard keeps the tip in a ref"; else no "discard keeps the tip in a ref"; fi
 
+echo "ship settles the checkout it rewrote"
+R=$(mktemp -d)
+(cd "$R" && git init -q -b main . && git commit -q --allow-empty -m init)
+cd "$R" || exit 1
+git checkout -q -b side
+git commit -q --allow-empty -m "side work"
+git checkout -q main
+git commit -q --allow-empty -m "main work"
+git checkout -q side
+"$BIN" ship side -y -m "side work" >/dev/null 2>&1
+assert_eq "ship on the current branch leaves it clean" "$(git status --porcelain)" ""
+assert_eq "ship moved the target" "$(git log --format=%s -1 main)" "side work"
+git checkout -q -b other main
+git commit -q --allow-empty -m "other work"
+git checkout -q main
+echo dirty > main-file
+assert_contains "ship refuses a dirty target" "$("$BIN" ship other -y -m "other work" 2>&1)" "uncommitted changes"
+
+echo "git rm still reaches git"
+R=$(newrepo)
+cd "$R" || exit 1
+echo x > gone.txt
+git add gone.txt >/dev/null 2>&1
+git commit -q -m gone
+"$BIN" rm gone.txt >/dev/null 2>&1
+assert_contains "gg rm removes the path" "$(git status --porcelain)" "D  gone.txt"
+
 echo "go and the fish wrapper"
 R=$(mktemp -d)
 (cd "$R" && git init -q -b main . && git commit -q --allow-empty -m init)
@@ -985,6 +1012,15 @@ echo new > fresh.txt
 assert_eq "zz drops every edit" "$(git status --porcelain)" "?? fresh.txt"
 assert_eq "zz keeps the new file" "$(cat fresh.txt)" "new"
 assert_contains "del is the long abbreviation" "$("$BIN" help)" "discard d, del"
+R=$(mktemp -d)
+(cd "$R" && git init -q -b main . && git commit -q --allow-empty -m init)
+cd "$R" || exit 1
+git tag atag >/dev/null 2>&1
+assert_contains "a tag is not a commit drop" "$("$BIN" discard atag 2>&1)" "new"
+assert_contains "the root commit is not droppable" "$("$BIN" discard "$(git rev-parse --short HEAD)" 2>&1)" "root commit"
+git commit -q --allow-empty -m second
+"$BIN" discard "$(git rev-parse --short HEAD)" >/dev/null 2>&1
+assert_eq "a sha drops that commit" "$(git log --format=%s -1)" "init"
 
 echo "discard and the upstream"
 R=$(mktemp -d)

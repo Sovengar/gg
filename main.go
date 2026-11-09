@@ -220,12 +220,19 @@ func resolveAny(arg string) (string, int) {
 	if a == "zz" {
 		return a, 0
 	}
+	if paths := fileIndex().Ambiguous(a); len(paths) > 0 {
+		ui.Errf("gg discard: %s names %d paths: %s", a, len(paths), strings.Join(paths, " "))
+		ui.Errf("gg discard: write the kind and the full path, or one path changeId")
+		return "", 2
+	}
 	var hits []string
 	if path, ok := fileIndex().Resolve(a); ok {
 		hits = append(hits, "path:"+path)
 	}
 	if branch, status := branchIndex().Resolve(a); status == ids.Resolved {
 		hits = append(hits, "branch:"+branch)
+	} else if status == ids.Ambiguous {
+		return "", 2
 	}
 	switch len(hits) {
 	case 1:
@@ -335,7 +342,6 @@ var removed = map[string]string{
 	"Dbr":     "Use gg discard <branch> --force, which drops unmerged commits and the worktree.",
 	"reap":    "Use gg discard <branch>, or gg discard zz for every uncommitted change.",
 	"abandon": "Use gg discard <commit>.",
-	"rm":      "Use gg discard <branch> --force.",
 	"cl-wd":   "Use gg discard to drop edits, and gg clear to delete new files.",
 	"cl-sa":   "It took the index. Use gg discard or gg clear.",
 	"us":      "It took the index. Use gg discard or gg clear.",

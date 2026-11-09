@@ -53,9 +53,10 @@ func Go(args []string) int {
 	if wt, found := findWorktree(worktrees(), branch); found && wt.branch != "" {
 		return goEnter(wt.path, exe)
 	}
+	base := ConventionBranch()
 	if branchExists(branch) {
 		if mode == "worktree" {
-			if rc := forkForGo(branch); rc != 0 {
+			if rc := forkFrom(branch, base); rc != 0 {
 				return rc
 			}
 			return goEnter(worktreePath(root, branch), exe)
@@ -66,7 +67,6 @@ func Go(args []string) int {
 		return goEnter(root, exe)
 	}
 
-	base := ConventionBranch()
 	if base == "" {
 		ui.Errf("gg go: %s does not exist, and this repository names no default branch to start it from", branch)
 		return 1
@@ -81,7 +81,7 @@ func Go(args []string) int {
 	}
 	if mode == "worktree" {
 		oplog.Record("go")
-		if rc := forkForGo(branch); rc != 0 {
+		if rc := forkFrom(branch, base); rc != 0 {
 			return rc
 		}
 		return goEnter(worktreePath(root, branch), exe)
@@ -128,9 +128,9 @@ func switchTo(branch string) int {
 	return gitx.Run("switch", branch)
 }
 
-// forkForGo makes the sibling worktree of a branch, folding a wip first.
-func forkForGo(branch string) int {
-	return worktreeNew([]string{branch}, "gg go")
+// forkFrom makes the sibling worktree of a branch, on that base.
+func forkFrom(branch, base string) int {
+	return worktreeNew([]string{branch, base}, "gg go")
 }
 
 // goEnter prints the directory, or runs the command inside it when the caller
