@@ -48,6 +48,17 @@ func OutputAll(args ...string) ([]string, error) {
 	return strings.Split(out, "\n"), nil
 }
 
+// OutputBin runs an external binary and returns trimmed stdout.
+func OutputBin(bin string, args ...string) (string, error) {
+	cmd := exec.Command(bin, args...)
+	cmd.Stderr = nil
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
 func exitCode(err error) int {
 	if err == nil {
 		return 0

@@ -92,6 +92,7 @@ func tree(args []string, opt view) int {
 	}
 
 	lanes, base := lanesOf(sha, n, opt)
+	notes := wtNotes()
 
 	fileLane(files.Load())
 	fmt.Println(ui.Dim("┊"))
@@ -118,7 +119,11 @@ func tree(args []string, opt view) int {
 			if i == 0 {
 				head = "┊╭┄"
 			}
-			fmt.Println(ui.Dim(head) + " " + ui.Red(branchHandle(l.name)) + " " + ui.Dim("["+l.name+"]"))
+			header := ui.Dim(head) + " " + ui.Red(branchHandle(l.name)) + " " + ui.Dim("["+l.name+"]")
+			if note := notes[l.name]; note != "" {
+				header += " " + note
+			}
+			fmt.Println(header)
 			for _, row := range l.commits {
 				fmt.Println(ui.Dim("┊") + row.Text)
 				if opt.files {
