@@ -30,8 +30,7 @@ brlm	fn:mergedBranches	branches already merged into HEAD	hint:Takes a target bra
 story	tool:gitlogue	animated history replay
 
 # --- Rollback work ---
-discard|d|del	fn:discard	drop a path, a commit, or a branch	hint:Takes a path, commit, branch or zz. -f forces, -y skips the question, -r drops the upstream too
-clear|cl	fn:clear	drop edits and new files, back to HEAD	hint:Asks before deleting new files, -f skips
+discard|d|del	fn:discard	drop a path, a commit, or a branch	hint:Takes a path, commit, branch or zz. zz deletes new files; -f forces, -y skips the question, -r drops the upstream too
 uncommit|uc	fn:uncommit	move commits back into the tree	hint:Takes changeIds, HEAD by default
 revert|rv	fn:revert	undo one commit with a new commit	hint:Takes a changeId, -m N for a merge
 
