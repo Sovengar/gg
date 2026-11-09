@@ -78,6 +78,9 @@ var functions = map[string]func([]string) int{
 	"abort":        ops.Abort,
 	"hooks":        ops.InstallHooks,
 	"wt":           ops.Worktree,
+	"fork":         ops.Fork,
+	"reap":         ops.Reap,
+	"ship":         ops.Ship,
 	"prNew":        ops.PRNew,
 	"prReview":     ops.PRReview,
 	"prReviewEdit": ops.PRReviewEdit,
@@ -144,6 +147,7 @@ var mutating = map[string]bool{
 	"reword": true, "rename": true, "describe": true, "desc": true,
 	"cbr": true, "dbr": true,
 	"mg": true, "wt": true, "merge": true,
+	"fork": true, "reap": true, "ship": true,
 	"pr": true, "rpr": true, "epr": true, "land": true,
 }
 

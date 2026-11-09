@@ -60,6 +60,9 @@ dbr	fn:deleteBranch	delete a branch, tip kept in a ref	hint:Safe: unmerged commi
 Dbr	fn:deleteBranchForce	delete a branch even when unmerged	hint:Force. Drops unmerged commits, keeps the tip ref	display:branch -D Dbr	variant
 merge|mg	fn:merge	merge a branch into this one	hint:Takes a branch. Fast-forward only; --no-ff keeps a merge commit
 wt	fn:wt	parallel branches, one worktree each	hint:Takes new|ls|rm
+fork|fk	fn:fork	work in a parallel directory	hint:Takes a branch, then a base
+reap	fn:reap	drop a worktree, its branch, or both	hint:Takes a name. -k keeps the branch, -d deletes it, -m sweeps what is merged, -r drops origin too
+ship	fn:ship	squash a branch onto the target, local only	hint:Takes a branch, -b target, -m message. Never pushes
 mzt	tool:git-machete	branch layout maintenance
 
 # --- Operations ---

@@ -24,7 +24,7 @@ func Worktree(args []string) int {
 	}
 	switch args[0] {
 	case "new":
-		return worktreeNew(args[1:])
+		return worktreeNew(args[1:], "gg wt new")
 	case "ls", "list":
 		return worktreeList()
 	case "rm", "remove":
@@ -33,6 +33,10 @@ func Worktree(args []string) int {
 		return worktreeUsage()
 	}
 }
+
+// Fork creates the sibling worktree that holds one branch. It is the verb the
+// table uses; `gg wt new` keeps the same call under the wt namespace.
+func Fork(args []string) int { return worktreeNew(args, "gg fork") }
 
 func worktreeUsage() int {
 	ui.Errf("gg wt new <branch> [base] | gg wt ls | gg wt rm <name|path> [--force]")
@@ -91,7 +95,7 @@ func worktreePath(root, branch string) string {
 	return filepath.Join(filepath.Dir(root), filepath.Base(root)+"."+slug)
 }
 
-func worktreeNew(args []string) int {
+func worktreeNew(args []string, label string) int {
 	if len(args) < 1 {
 		return worktreeUsage()
 	}
@@ -104,19 +108,19 @@ func worktreeNew(args []string) int {
 	}
 	root, ok := repoRoot()
 	if !ok {
-		ui.Errf("gg wt new: not inside a work tree")
+		ui.Errf("%s: not inside a work tree", label)
 		return 1
 	}
 	path := worktreePath(root, branch)
 	if _, err := os.Stat(path); err == nil {
-		ui.Errf("gg wt new: %s already exists", path)
+		ui.Errf("%s: %s already exists", label, path)
 		return 1
 	}
 
 	gitArgs := []string{"worktree", "add"}
 	if _, err := gitx.Output("show-ref", "--verify", "--quiet", "refs/heads/"+branch); err == nil {
 		if w, busy := findWorktree(worktrees(), branch); busy {
-			ui.Errf("gg wt new: branch %s is checked out in %s", branch, w.path)
+			ui.Errf("%s: branch %s is checked out in %s", label, branch, w.path)
 			return 1
 		}
 		gitArgs = append(gitArgs, path, branch)
@@ -126,7 +130,7 @@ func worktreeNew(args []string) int {
 	if rc := gitx.Run(gitArgs...); rc != 0 {
 		return rc
 	}
-	ui.Errf("gg wt new: %s", path)
+	ui.Errf("%s: %s", label, path)
 	return 0
 }
 

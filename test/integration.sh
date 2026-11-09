@@ -757,6 +757,35 @@ if "$BIN" wt rm side >/dev/null 2>&1; then no "wt rm refuses a dirty worktree"; 
 if [ -d "$side" ]; then no "wt rm --force removes it"; else ok "wt rm --force removes it"; fi
 assert_lacks "wt ls forgot it" "$("$BIN" wt ls)" "side"
 
+echo "fork, ship and reap"
+R=$(mktemp -d)
+(cd "$R" && git init -q -b main . && git commit -q --allow-empty -m init)
+cd "$R" || exit 1
+"$BIN" fork side >/dev/null 2>&1
+side="$(dirname "$R")/$(basename "$R").side"
+if [ -f "$side/.git" ]; then ok "fork makes a sibling worktree"; else no "fork makes a sibling worktree"; fi
+assert_contains "fork refuses a directory that exists" "$("$BIN" fork side 2>&1)" "already exists"
+git -C "$side" commit -q --allow-empty -m "side one"
+git -C "$side" commit -q --allow-empty -m "side two"
+assert_contains "ship wants a message for two commits" "$("$BIN" ship side 2>&1)" "name the squashed message"
+"$BIN" ship side -y -m "side work" >/dev/null 2>&1
+assert_eq "ship squashes the branch into one commit" "$(git rev-list --count main)" "2"
+assert_eq "ship fast-forwards the target" "$(git log --format=%s -1 main)" "side work"
+assert_eq "ship rewrites the branch too" "$(git rev-parse side)" "$(git rev-parse main)"
+if [ -d "$side" ]; then no "ship removes the worktree"; else ok "ship removes the worktree"; fi
+"$BIN" fork other >/dev/null 2>&1
+other="$(dirname "$R")/$(basename "$R").other"
+if "$BIN" reap other </dev/null >/dev/null 2>&1; then no "reap asks before deleting"; else ok "reap asks before deleting"; fi
+"$BIN" reap other -k >/dev/null 2>&1
+if [ -d "$other" ]; then no "reap -k removes the worktree"; else ok "reap -k removes the worktree"; fi
+if git rev-parse --verify --quiet refs/heads/other >/dev/null; then ok "reap -k keeps the branch"; else no "reap -k keeps the branch"; fi
+"$BIN" reap other -d >/dev/null 2>&1
+if git rev-parse --verify --quiet refs/heads/other >/dev/null; then no "reap -d deletes the branch"; else ok "reap -d deletes the branch"; fi
+if git rev-parse --verify --quiet refs/gg/deleted/other >/dev/null; then ok "reap keeps the tip in a ref"; else no "reap keeps the tip in a ref"; fi
+git branch swept main
+assert_contains "reap --merged lists the sweep" "$("$BIN" reap --merged -y 2>&1)" "swept"
+if git rev-parse --verify --quiet refs/heads/swept >/dev/null; then no "reap --merged deletes it"; else ok "reap --merged deletes it"; fi
+
 echo "the wip fold waits for a stopped operation"
 R=$(newrepo)
 cd "$R" || exit 1

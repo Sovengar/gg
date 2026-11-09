@@ -171,6 +171,10 @@ Work that must not share a checkout goes to its own worktree:
 gg wt new side     sibling directory <repo>.side on branch side; folds wip first
 gg wt ls           branch, path, and how dirty each worktree is
 gg wt rm side      remove it; --force when it is dirty
+gg fork side       the same directory, under the verb the table uses (alias: fk)
+gg ship side       squash the branch into one commit on the target, drop its worktree
+gg reap side       remove the worktree; -k keeps the branch, -d deletes it
+gg reap --merged   sweep every branch and worktree already merged in the default
 ```
 
 `gg st` and bare `gg` also read `wt list --format json`, so each worktree lane
@@ -179,6 +183,33 @@ it already has, `⚑` changes in that worktree's tree. With a single worktree
 there is nothing to compare, so gg skips the call; without the `wt` binary the
 markers disappear and nothing else changes.
 
+### Shipping a branch
+
+`gg ship` is the composing end of a branch: it turns its commits into one,
+replays it on the local target, fast-forwards the target and removes the
+worktree. It never pushes. `gg land` is the publishing end: it fast-forwards the
+target and pushes, and it keeps the commits. `gg pr` is the review path.
+
+```
+gg ship side       squash side into one commit on the default branch
+gg ship side -m "feat: side work"   name the message when it holds several commits
+```
+
+`gg reap` is the only verb that removes a worktree. A branch that still has one
+gets a question: keep the branch or delete it too. When origin holds the branch,
+it asks about the remote separately; `-r` answers that in advance. Without a
+terminal it refuses instead of guessing, so answer with `-k` or `-d`.
+
+
+`gg ship` is the composing end of a branch: it turns the commits into one, replays
+it on the local target and fast-forwards it, and never pushes. `gg land` is the
+publishing end: it fast-forwards the target and pushes, and it keeps the commits.
+A draft pushed with `gg pr` stars the review path, so ship stays local on purpose.
+
+`gg reap` is the only verb that removes a worktree. A branch that still has one
+gets a question: keep the branch or delete it too. When origin holds the branch,
+it asks about the remote separately; `-r` answers that in advance. Without a
+terminal it refuses instead of guessing, so ask the question with `-k` or `-d`.
 ### ChangeIds
 
 Every file, commit and branch in gg carries a changeId: two to four
