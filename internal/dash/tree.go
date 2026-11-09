@@ -166,26 +166,37 @@ func fileLane(fidx *files.Index) {
 	if gitx.InWip() {
 		head += " " + ui.Yellow("wip")
 	}
-	fmt.Println(head + emptyNote(len(rows)))
+	scope := gitx.Prefix()
+	if scope != "" {
+		head += " " + ui.Dim("in "+strings.TrimSuffix(scope, "/"))
+	}
+	fmt.Println(head + emptyNote(len(rows), scope != ""))
 	for _, row := range rows {
 		fmt.Println(ui.Dim("┊") + "   " + row)
 	}
 }
 
-func emptyNote(n int) string {
+func emptyNote(n int, scoped bool) string {
 	if n > 0 {
 		return ""
+	}
+	if scoped {
+		return " " + ui.Dim("(no changes here)")
 	}
 	return " " + ui.Dim("(no changes)")
 }
 
 // fileRows renders every dirty path with a changeId and one status letter.
-// Untracked paths read A, like a branch that adds the file.
+// Untracked paths read A, like a branch that adds the file. Inside a
+// subdirectory git names the paths outside it with ../, and those rows are
+// left out: the changeIds still cover the whole tree, so a verb can still take
+// one the lane does not draw.
 func fileRows(fidx *files.Index) []string {
 	lines, err := gitx.OutputAll("status", "--short", "--untracked-files=all")
 	if err != nil {
 		return nil
 	}
+	scoped := gitx.Prefix() != ""
 
 	type row struct{ handle, status, path string }
 	var rows []row
@@ -194,11 +205,15 @@ func fileRows(fidx *files.Index) []string {
 		if strings.HasPrefix(l, "## ") || len(l) < 4 {
 			continue
 		}
-		handle := fidx.ChangeID(strings.TrimSpace(l[3:]))
+		path := strings.TrimSpace(l[3:])
+		if scoped && strings.HasPrefix(path, "../") {
+			continue
+		}
+		handle := fidx.ChangeID(path)
 		if len(handle) > width {
 			width = len(handle)
 		}
-		rows = append(rows, row{handle, fileStatus(l[:2]), strings.TrimSpace(l[3:])})
+		rows = append(rows, row{handle, fileStatus(l[:2]), path})
 	}
 
 	out := make([]string, 0, len(rows))
