@@ -47,16 +47,29 @@ func Reap(args []string) int {
 		}
 		return reapMerged(force, yes, remote)
 	}
-	if len(names) != 1 {
-		ui.Errf("gg reap <branch|path> [--keep-branch|--delete-branch] [--force] [--merged]")
+	if len(names) == 0 {
+		ui.Errf("gg reap <branch|path>... [--keep-branch|--delete-branch] [--force] [--merged]")
 		return 2
 	}
-	return reapOne(names[0], keep, drop, force, yes, remote, yes)
+	rc := 0
+	st := &reapStats{}
+	for _, name := range names {
+		if code := reapOne(name, keep, drop, force, yes, remote, false, st); code != 0 {
+			rc = code
+		}
+	}
+	if st.branches > 0 {
+		recentBranches(5)
+	}
+	return rc
 }
+
+// reapStats counts what one reap run deleted, so the branch list prints once.
+type reapStats struct{ branches int }
 
 // reapOne drops one worktree and/or branch. asked reports whether the caller
 // already answered the prompts, so a sweep does not ask once per branch.
-func reapOne(name string, keep, drop, force, yes, remote, asked bool) int {
+func reapOne(name string, keep, drop, force, yes, remote, asked bool, st *reapStats) int {
 	all := worktrees()
 	wt, hasWt := findWorktree(all, name)
 	branch := name
@@ -109,6 +122,7 @@ func reapOne(name string, keep, drop, force, yes, remote, asked bool) int {
 		if rc := dropBranch(branch, force); rc != 0 {
 			return rc
 		}
+		st.branches++
 		if !revExists("refs/remotes/origin/" + branch) {
 			return 0
 		}
@@ -171,16 +185,20 @@ func reapMerged(force, yes, remote bool) int {
 		}
 	}
 	rc := 0
+	st := &reapStats{}
 	for _, name := range names {
-		if code := reapOne(name, false, true, force, true, remote, true); code != 0 {
+		if code := reapOne(name, false, true, force, true, remote, true, st); code != 0 {
 			rc = code
 		}
+	}
+	if st.branches > 0 {
+		recentBranches(5)
 	}
 	return rc
 }
 
 // dropBranch deletes one branch and keeps its tip reachable in
-// refs/gg/deleted, the way gg dbr does.
+// refs/gg/deleted, so the changeId printed by gg br brings it back.
 func dropBranch(name string, force bool) int {
 	sha, err := gitx.Output("rev-parse", "--verify", "refs/heads/"+name)
 	if err != nil {

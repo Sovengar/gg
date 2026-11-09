@@ -31,7 +31,7 @@ type Entry struct {
 	Tool        string
 	Hidden      bool
 	Variant     bool   // a flag on another verb, listed by gg hh only
-	DisplayOnly bool   // a help row with no name to type, e.g. branch -D
+	DisplayOnly bool   // a help row with no name to type, e.g. commit -e
 	NoGit       bool   // no git equivalent behind the verb
 	Shown       string // name column override in help, e.g. status (st, sta, stf)
 	Fn          func(args []string) int
@@ -61,10 +61,6 @@ var functions = map[string]func([]string) int{
 	"diff":         diffview.Run,
 	"branches":     ops.Branches,
 	"stack":        func([]string) int { return ops.Stack() },
-	"deleteBranch": ops.DeleteBranch,
-	"deleteBranchForce": func(args []string) int {
-		return ops.DeleteBranch(append([]string{"-D"}, args...))
-	},
 	"push":         ops.Push,
 	"update":       ops.Update,
 	"sync":         ops.Sync,
@@ -81,6 +77,8 @@ var functions = map[string]func([]string) int{
 	"fork":         ops.Fork,
 	"reap":         ops.Reap,
 	"ship":         ops.Ship,
+	"go":           ops.Go,
+	"shell":        ops.Shell,
 	"prNew":        ops.PRNew,
 	"prReview":     ops.PRReview,
 	"prReviewEdit": ops.PRReviewEdit,
@@ -145,8 +143,8 @@ var mutating = map[string]bool{
 	"new": true, "discard": true, "clear": true, "cl": true,
 	"revert": true, "rv": true,
 	"reword": true, "rename": true, "describe": true, "desc": true,
-	"cbr": true, "dbr": true,
-	"mg": true, "wt": true, "merge": true,
+	"cbr": true,
+	"mg":  true, "wt": true, "merge": true,
 	"fork": true, "reap": true, "ship": true,
 	"pr": true, "rpr": true, "epr": true, "land": true,
 }

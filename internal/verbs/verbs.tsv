@@ -54,14 +54,12 @@ edit|e	fn:edit	stop a rebase at a commit	hint:Takes a changeId
 rebase|rb	fn:rebase	replay commits onto another base	hint:Takes a branch, -i for interactive
 
 # --- Branching ---
-branch switch	fn:branches	change branch	hint:Takes a branch	display:branch <name>	variant
 cbr	switch -c	branch new and switch	hint:Takes a branch. branch new <name> works too	display:branch -c cbr	variant
-dbr	fn:deleteBranch	delete a branch, tip kept in a ref	hint:Safe: unmerged commits stay. Takes a branch or a changeId	display:branch -d dbr	variant
-Dbr	fn:deleteBranchForce	delete a branch even when unmerged	hint:Force. Drops unmerged commits, keeps the tip ref	display:branch -D Dbr	variant
 merge|mg	fn:merge	merge a branch into this one	hint:Takes a branch. Fast-forward only; --no-ff keeps a merge commit
-wt	fn:wt	parallel branches, one worktree each	hint:Takes new|ls|rm
+go	fn:go	go where a branch lives	hint:Takes a branch. A missing one asks about a worktree; -- cmd runs there
+wt	fn:wt	parallel branches, one worktree each	hint:Takes new|ls|rm. fork and reap are the named verbs
 fork|fk	fn:fork	work in a parallel directory	hint:Takes a branch, then a base
-reap	fn:reap	drop a worktree, its branch, or both	hint:Takes a name. -k keeps the branch, -d deletes it, -m sweeps what is merged, -r drops origin too
+reap	fn:reap	drop a worktree, its branch, or both	hint:Takes branches or paths. -k keeps the branch, -d/-D delete it, -m sweeps merged, -r drops origin too
 ship	fn:ship	squash a branch onto the target, local only	hint:Takes a branch, -b target, -m message. Never pushes
 mzt	tool:git-machete	branch layout maintenance
 
@@ -89,6 +87,7 @@ prdash	tool:prdash	PR dashboard over the open PRs
 # --- Others ---
 changeId|id	id	resolve a changeId to a sha	nogit
 hooks	fn:hooks	install the Change-Id hook
+shell	fn:shell	install the fish wrapper behind gg go	hint:Takes install, uninstall or show	nogit
 sim	tool:git-sim	render an operation before running
 hunk	tool:hunk	review a diff in Hunk	hint:Takes diff, show, or a revision
 tuicr	tool:tuicr	code review TUI	hint:Takes a revset, -w for the working tree

@@ -19,8 +19,9 @@ func Branches(args []string) int {
 		return listBranches()
 	}
 	if strings.HasPrefix(args[0], "-") {
-		if deleteFlag(args[0]) {
-			return DeleteBranch(args)
+		if args[0] == "-d" || args[0] == "-D" || args[0] == "--delete" {
+			ui.Errf("gg branch %s is gone. Use gg reap <branch>, with -D to drop unmerged commits.", args[0])
+			return 2
 		}
 		if createFlag(args[0]) {
 			if len(args) < 2 {
@@ -262,72 +263,6 @@ func revExists(token string) bool {
 	return err == nil
 }
 
-// DeleteBranch drops a branch by name or changeId. It deletes the safe way
-// unless asked to force, and it keeps the tip in refs/gg/deleted/<name>, so a
-// branch that was not meant to go can be recreated from the changeId it prints.
-func DeleteBranch(args []string) int {
-	force := false
-	var names []string
-	for _, a := range args {
-		switch a {
-		case "-d", "--delete":
-		case "-D", "-f", "--force":
-			force = true
-		default:
-			if strings.HasPrefix(a, "-") {
-				ui.Errf("gg dbr: unknown flag %s. Use -d (safe) or -D (force).", a)
-				return 2
-			}
-			names = append(names, a)
-		}
-	}
-	if len(names) == 0 {
-		ui.Errf("gg dbr <branch>: name the branch to delete")
-		return 2
-	}
-
-	current, _ := gitx.Output("rev-parse", "--abbrev-ref", "HEAD")
-	rc := 0
-	deleted := 0
-	for _, name := range names {
-		if name == current {
-			ui.Errf("gg dbr: %s is the current branch; switch away first", name)
-			rc = 1
-			continue
-		}
-		if !branchExists(name) {
-			ui.Errf("gg dbr: no branch named %s", name)
-			rc = 1
-			continue
-		}
-		sha, err := gitx.Output("rev-parse", "--verify", "refs/heads/"+name)
-		if err != nil {
-			ui.Errf("gg dbr: cannot read the tip of %s", name)
-			rc = 1
-			continue
-		}
-		flag := "-d"
-		if force {
-			flag = "-D"
-		}
-		if code := gitx.Run("branch", flag, name); code != 0 {
-			if !force {
-				ui.Errf("gg dbr: %s holds commits that are not merged. -D drops them.", name)
-			}
-			rc = code
-			continue
-		}
-		gitx.Output("update-ref", "refs/gg/deleted/"+name, sha)
-		ui.Errf("gg: %s is deleted. Its tip stays in refs/gg/deleted/%s", name, name)
-		ui.Errf("gg: to bring it back: gg cbr %s %s", name, sha)
-		deleted++
-	}
-	if deleted > 0 {
-		recentBranches(5)
-	}
-	return rc
-}
-
 // createBranch makes a branch and switches to it, leaving the rest of the
 // arguments to git switch -c.
 func createBranch(args []string) int {
@@ -340,15 +275,6 @@ func createBranch(args []string) int {
 func createFlag(a string) bool {
 	switch a {
 	case "-c", "--create":
-		return true
-	}
-	return false
-}
-
-// deleteFlag reports whether the first argument asks for a deletion.
-func deleteFlag(a string) bool {
-	switch a {
-	case "-d", "-D", "-f", "--delete", "--force":
 		return true
 	}
 	return false
