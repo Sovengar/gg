@@ -188,47 +188,6 @@ func tracked(path string) bool {
 	return err == nil
 }
 
-// Discard drops edits to tracked files, and keeps new files: nothing in a
-// commit holds them, so deleting one is not a discard. It is the but verb of
-// the same name; `gg clear` owns the new files.
-func Discard(args []string) int {
-	var paths []string
-	for _, a := range args {
-		switch a {
-		case "-a", "--all":
-			ui.Errf("gg discard: no -a. A bare discard drops every edit already.")
-			return 2
-		case "-f", "--force":
-			ui.Errf("gg discard: -f deletes nothing here. Use gg clear.")
-			return 2
-		default:
-			paths = append(paths, a)
-		}
-	}
-	if len(paths) == 0 {
-		return gitx.Run("reset", "--hard", "--quiet")
-	}
-
-	var known, fresh []string
-	for _, p := range paths {
-		if tracked(p) {
-			known = append(known, p)
-			continue
-		}
-		fresh = append(fresh, p)
-	}
-	if len(fresh) > 0 {
-		ui.Errf("gg discard: %d path(s) are new, so no change is there to drop:", len(fresh))
-		for _, p := range fresh {
-			ui.Errf("    %s", p)
-		}
-		ui.Errf("gg discard: nothing touched. gg clear deletes new files.")
-		return 1
-	}
-	argv := append([]string{"restore", "--source=HEAD", "--staged", "--worktree", "--"}, known...)
-	return gitx.Run(argv...)
-}
-
 // Clear drops every edit and deletes the new files, so the tree matches HEAD.
 // No commit holds a new file, so git cannot bring one back: it asks first,
 // and -f skips the question.

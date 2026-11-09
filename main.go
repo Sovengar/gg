@@ -165,6 +165,14 @@ func resolveArgs(name string, args []string) ([]string, int) {
 				return out, 2
 			}
 		}
+		if anyVerb(name) && !isRef(a) && !isPath(a) {
+			typed, status := resolveAny(a)
+			if status != 0 {
+				return out, status
+			}
+			out[i] = typed
+			continue
+		}
 		if !ids.Shaped(strings.TrimPrefix(a, "@")) || isRef(a) || isPath(a) {
 			out[i] = a
 			continue
@@ -190,6 +198,82 @@ func resolveArgs(name string, args []string) ([]string, int) {
 		}
 	}
 	return out, 0
+}
+
+// anyVerbs take a changeId of any kind: a dirty path, a commit or a branch.
+var anyVerbs = map[string]bool{"discard": true}
+
+func anyVerb(name string) bool { return anyVerbs[name] }
+
+// resolveAny types the argument so the verb knows what it names. The kind
+// prefixes path:, commit: and branch: force one kind. A token that names two
+// kinds fails instead of guessing.
+func resolveAny(arg string) (string, int) {
+	a := strings.TrimPrefix(arg, "@")
+	for _, kind := range []string{"path", "commit", "branch"} {
+		rest, ok := strings.CutPrefix(a, kind+":")
+		if !ok {
+			continue
+		}
+		return kind + ":" + resolveKind(kind, rest), 0
+	}
+	if a == "zz" {
+		return a, 0
+	}
+	var hits []string
+	if path, ok := fileIndex().Resolve(a); ok {
+		hits = append(hits, "path:"+path)
+	}
+	if branch, status := branchIndex().Resolve(a); status == ids.Resolved {
+		hits = append(hits, "branch:"+branch)
+	}
+	switch len(hits) {
+	case 1:
+		return hits[0], 0
+	case 2:
+		ui.Errf("gg discard: %s names more than one thing: %s", a, strings.Join(hits, ", "))
+		ui.Errf("gg discard: write the kind, for example %s", hits[0])
+		return "", 2
+	}
+	if sha, status := changeIndex().Resolve(a); status == ids.Resolved {
+		return "commit:" + sha.SHA, 0
+	}
+	if root, ok := kindValue("commit", a); ok {
+		return "commit:" + root, 0
+	}
+	return a, 0
+}
+
+// resolveKind turns the tail of a typed argument into the value the kind needs:
+// a path, a branch name or a sha.
+func resolveKind(kind, name string) string {
+	if v, ok := kindValue(kind, name); ok {
+		return v
+	}
+	return name
+}
+
+// kindValue is the one lookup each kind knows how to do.
+func kindValue(kind, name string) (string, bool) {
+	switch kind {
+	case "path":
+		return fileIndex().Resolve(name)
+	case "branch":
+		if b, status := branchIndex().Resolve(name); status == ids.Resolved {
+			return b, true
+		}
+		if _, err := gitx.Output("rev-parse", "--verify", "--quiet", "refs/heads/"+name); err == nil {
+			return name, true
+		}
+	case "commit":
+		if ref, status := changeIndex().Resolve(name); status == ids.Resolved {
+			return ref.SHA, true
+		}
+		if sha, err := gitx.Output("rev-parse", "--verify", "--quiet", name+"^{commit}"); err == nil && sha != "" {
+			return sha, true
+		}
+	}
+	return "", false
 }
 
 var fileIdx *files.Index
@@ -229,7 +313,7 @@ var branchVerbs = map[string]bool{
 	"cbr": true,
 	"mg":  true, "merge": true,
 	"rebase": true, "rb": true,
-	"land": true, "reap": true, "ship": true,
+	"land": true, "ship": true,
 }
 
 func branchVerb(name string) bool { return branchVerbs[name] }
@@ -245,14 +329,17 @@ func newSubcommand(name string) bool { return newSubcommandVerbs[name] }
 // removed verbs name the verb that took their work, so an old habit fails with
 // a direction instead of a git error.
 var removed = map[string]string{
-	"sw":     "Use gg go <name> to reach a branch, or gg cbr <name> to create and switch.",
-	"switch": "Use gg go <name> to reach a branch, or gg cbr <name> to create and switch.",
-	"dbr":    "Use gg reap <branch>, which drops its worktree too.",
-	"Dbr":    "Use gg reap <branch> --force, which drops unmerged commits and the worktree.",
-	"cl-wd":  "Use gg discard to drop edits, and gg clear to delete new files.",
-	"cl-sa":  "It took the index. Use gg discard or gg clear.",
-	"us":     "It took the index. Use gg discard or gg clear.",
-	"raw":    "An unknown verb still reaches git: gg <verb>. The call is no longer recorded for undo.",
+	"sw":      "Use gg go <name> to reach a branch, or gg cbr <name> to create and switch.",
+	"switch":  "Use gg go <name> to reach a branch, or gg cbr <name> to create and switch.",
+	"dbr":     "Use gg discard <branch>, which drops its worktree too.",
+	"Dbr":     "Use gg discard <branch> --force, which drops unmerged commits and the worktree.",
+	"reap":    "Use gg discard <branch>, or gg discard zz for every uncommitted change.",
+	"abandon": "Use gg discard <commit>.",
+	"rm":      "Use gg discard <branch> --force.",
+	"cl-wd":   "Use gg discard to drop edits, and gg clear to delete new files.",
+	"cl-sa":   "It took the index. Use gg discard or gg clear.",
+	"us":      "It took the index. Use gg discard or gg clear.",
+	"raw":     "An unknown verb still reaches git: gg <verb>. The call is no longer recorded for undo.",
 }
 
 // noResolve are verbs whose arguments are not changeIDs.

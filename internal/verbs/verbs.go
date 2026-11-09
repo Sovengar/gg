@@ -66,7 +66,6 @@ var functions = map[string]func([]string) int{
 	"sync":         ops.Sync,
 	"uncommit":     ops.Uncommit,
 	"move":         ops.Move,
-	"abandon":      ops.Abandon,
 	"revert":       ops.Revert,
 	"edit":         ops.Edit,
 	"squash":       ops.Squash,
@@ -75,7 +74,6 @@ var functions = map[string]func([]string) int{
 	"hooks":        ops.InstallHooks,
 	"wt":           ops.Worktree,
 	"fork":         ops.Fork,
-	"reap":         ops.Reap,
 	"ship":         ops.Ship,
 	"go":           ops.Go,
 	"shell":        ops.Shell,
@@ -136,7 +134,7 @@ var mutating = map[string]bool{
 	"commit": true, "c": true, "ce": true, "amend": true, "uncommit": true,
 	"split": true, "squash": true, "absorb": true, "empty": true,
 	"move": true, "publish": true, "sync": true, "update": true,
-	"abandon": true, "copy": true, "cp": true, "push": true, "p": true, "up": true,
+	"copy": true, "cp": true, "push": true, "p": true, "up": true,
 	"rebase": true, "rb": true,
 	"tag": true, "t": true,
 	"edit": true, "continue": true, "hooks": true, "abort": true,
@@ -145,7 +143,7 @@ var mutating = map[string]bool{
 	"reword": true, "rename": true, "describe": true, "desc": true,
 	"cbr": true,
 	"mg":  true, "wt": true, "merge": true,
-	"fork": true, "reap": true, "ship": true,
+	"fork": true, "ship": true,
 	"pr": true, "rpr": true, "epr": true, "land": true,
 }
 

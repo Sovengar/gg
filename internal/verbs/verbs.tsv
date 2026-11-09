@@ -30,10 +30,9 @@ brlm	fn:mergedBranches	branches already merged into HEAD	hint:Takes a target bra
 story	tool:gitlogue	animated history replay
 
 # --- Rollback work ---
-discard|d	fn:discard	drop edits, keep new files	hint:Bare drops all. Takes a changeId or a path
+discard|d|del	fn:discard	drop a path, a commit, or a branch	hint:Takes a path, commit, branch or zz. -f forces, -y skips the question, -r drops the upstream too
 clear|cl	fn:clear	drop edits and new files, back to HEAD	hint:Asks before deleting new files, -f skips
 uncommit|uc	fn:uncommit	move commits back into the tree	hint:Takes changeIds, HEAD by default
-abandon	fn:abandon	drop one commit, replay its descendants	hint:Takes a changeId
 revert|rv	fn:revert	undo one commit with a new commit	hint:Takes a changeId, -m N for a merge
 
 # --- Register work ---
@@ -57,9 +56,8 @@ rebase|rb	fn:rebase	replay commits onto another base	hint:Takes a branch, -i for
 cbr	switch -c	branch new and switch	hint:Takes a branch. branch new <name> works too	display:branch -c cbr	variant
 merge|mg	fn:merge	merge a branch into this one	hint:Takes a branch. Fast-forward only; --no-ff keeps a merge commit
 go	fn:go	go where a branch lives	hint:Takes a branch. A missing one asks about a worktree; -- cmd runs there
-wt	fn:wt	parallel branches, one worktree each	hint:Takes new|ls|rm. fork and reap are the named verbs
+wt	fn:wt	parallel branches, one worktree each	hint:Takes new|ls|rm. fork and discard are the named verbs
 fork|fk	fn:fork	work in a parallel directory	hint:Takes a branch, then a base
-reap	fn:reap	drop a worktree, its branch, or both	hint:Takes branches or paths. -k keeps the branch, -d/-D delete it, -m sweeps merged, -r drops origin too
 ship	fn:ship	squash a branch onto the target, local only	hint:Takes a branch, -b target, -m message. Never pushes
 mzt	tool:git-machete	branch layout maintenance
 

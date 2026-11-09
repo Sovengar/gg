@@ -30,6 +30,9 @@ assert_lacks() { # name, haystack, needle
 	esac
 }
 
+# strip_age hides the relative age column, so two runs cannot differ by a second.
+strip_age() { sed -E 's/ [0-9]+(s|m|h|d|w|mo) / AGE /g'; }
+
 wipfile() { git rev-parse --git-path gg/wip; }
 wipsha() { cat "$(wipfile)" 2>/dev/null || echo gone; }
 
@@ -341,8 +344,8 @@ assert_contains "stf marks the capped file list" "$("$BIN" stf)" "+2 more"
 assert_eq "stf lists five changed files" "$("$BIN" stf | grep -c '^┊   [AMD] ')" "5"
 assert_eq "st -a lists every changed file" "$("$BIN" st -a | grep -c '^┊   [AMD] ')" "7"
 assert_lacks "st -a lifts the file cap" "$("$BIN" st -a)" "+2 more"
-assert_eq "sta is st -a" "$("$BIN" sta)" "$("$BIN" st -a)"
-assert_eq "stf is st -f" "$("$BIN" stf)" "$("$BIN" st -f)"
+assert_eq "sta is st -a" "$("$BIN" sta | strip_age)" "$("$BIN" st -a | strip_age)"
+assert_eq "stf is st -f" "$("$BIN" stf | strip_age)" "$("$BIN" st -f | strip_age)"
 
 R=$(newrepo)
 cd "$R" || exit 1
@@ -457,8 +460,9 @@ cd "$R" || exit 1
 for i in 1 2 3; do git commit -q --allow-empty -m "c$i"; done
 before=$(git rev-list --count HEAD)
 mid=$("$BIN" log 2 | tail -1 | awk '{print $2}')
-"$BIN" abandon "$mid" >/dev/null 2>&1
-assert_eq "abandon drops one commit" "$(git rev-list --count HEAD)" "$((before - 1))"
+"$BIN" discard "$mid" >/dev/null 2>&1
+assert_eq "discard drops one commit" "$(git rev-list --count HEAD)" "$((before - 1))"
+assert_contains "abandon is gone with a direction" "$("$BIN" abandon "$mid" 2>&1)" "gg discard"
 assert_contains "help groups by category" "$("$BIN" help)" "Edit saved work"
 assert_contains "help shows Register work" "$("$BIN" help)" "Register work"
 assert_contains "help shows Branching" "$("$BIN" help)" "Branching"
@@ -757,7 +761,7 @@ if "$BIN" wt rm side >/dev/null 2>&1; then no "wt rm refuses a dirty worktree"; 
 if [ -d "$side" ]; then no "wt rm --force removes it"; else ok "wt rm --force removes it"; fi
 assert_lacks "wt ls forgot it" "$("$BIN" wt ls)" "side"
 
-echo "fork, ship and reap"
+echo "fork, ship and discard"
 R=$(mktemp -d)
 (cd "$R" && git init -q -b main . && git commit -q --allow-empty -m init)
 cd "$R" || exit 1
@@ -775,16 +779,12 @@ assert_eq "ship rewrites the branch too" "$(git rev-parse side)" "$(git rev-pars
 if [ -d "$side" ]; then no "ship removes the worktree"; else ok "ship removes the worktree"; fi
 "$BIN" fork other >/dev/null 2>&1
 other="$(dirname "$R")/$(basename "$R").other"
-if "$BIN" reap other </dev/null >/dev/null 2>&1; then no "reap asks before deleting"; else ok "reap asks before deleting"; fi
-"$BIN" reap other -k >/dev/null 2>&1
-if [ -d "$other" ]; then no "reap -k removes the worktree"; else ok "reap -k removes the worktree"; fi
-if git rev-parse --verify --quiet refs/heads/other >/dev/null; then ok "reap -k keeps the branch"; else no "reap -k keeps the branch"; fi
-"$BIN" reap other -d >/dev/null 2>&1
-if git rev-parse --verify --quiet refs/heads/other >/dev/null; then no "reap -d deletes the branch"; else ok "reap -d deletes the branch"; fi
-if git rev-parse --verify --quiet refs/gg/deleted/other >/dev/null; then ok "reap keeps the tip in a ref"; else no "reap keeps the tip in a ref"; fi
-git branch swept main
-assert_contains "reap --merged lists the sweep" "$("$BIN" reap --merged -y 2>&1)" "swept"
-if git rev-parse --verify --quiet refs/heads/swept >/dev/null; then no "reap --merged deletes it"; else ok "reap --merged deletes it"; fi
+if "$BIN" discard other </dev/null >/dev/null 2>&1; then no "discard asks before removing a worktree"; else ok "discard asks before removing a worktree"; fi
+if [ -d "$other" ]; then ok "the refused discard kept the worktree"; else no "the refused discard kept the worktree"; fi
+"$BIN" discard other -y >/dev/null 2>&1
+if [ -d "$other" ]; then no "discard -y removes the worktree"; else ok "discard -y removes the worktree"; fi
+if git rev-parse --verify --quiet refs/heads/other >/dev/null; then no "discard -y deletes the branch"; else ok "discard -y deletes the branch"; fi
+if git rev-parse --verify --quiet refs/gg/deleted/other >/dev/null; then ok "discard keeps the tip in a ref"; else no "discard keeps the tip in a ref"; fi
 
 echo "go and the fish wrapper"
 R=$(mktemp -d)
@@ -948,27 +948,62 @@ assert_eq "branch -c creates and switches" "$(git rev-parse --abbrev-ref HEAD)" 
 "$BIN" branch new oldform >/dev/null 2>&1
 assert_eq "branch new still creates" "$(git rev-parse --abbrev-ref HEAD)" "oldform"
 "$BIN" br tb >/dev/null 2>&1
-recent=$(NO_COLOR=1 "$BIN" reap side 2>/dev/null)
-assert_eq "reap deletes a merged branch" "$(git for-each-ref refs/heads/side --format='%(refname:short)')" ""
-assert_eq "reap keeps a backup ref" "$(git for-each-ref refs/gg/deleted/side --format='%(refname)')" "refs/gg/deleted/side"
-assert_contains "reap lists the newest branches" "$recent" "branches (5 newest"
-assert_contains "reap keeps the default branch in view" "$recent" "tb"
-assert_eq "reap lists a branch once" "$(printf '%s\n' "$recent" | grep -c tb)" "1"
+recent=$(NO_COLOR=1 "$BIN" discard side 2>/dev/null)
+assert_eq "discard deletes a merged branch" "$(git for-each-ref refs/heads/side --format='%(refname:short)')" ""
+assert_eq "discard keeps a backup ref" "$(git for-each-ref refs/gg/deleted/side --format='%(refname)')" "refs/gg/deleted/side"
+assert_contains "discard lists the newest branches" "$recent" "branches (5 newest"
+assert_contains "discard keeps the default branch in view" "$recent" "tb"
+assert_eq "discard lists a branch once" "$(printf '%s\n' "$recent" | grep -c tb)" "1"
 git branch multi1 >/dev/null 2>&1
 git branch multi2 >/dev/null 2>&1
-"$BIN" reap multi1 multi2 >/dev/null 2>&1
-assert_eq "reap deletes several names at once" "$(git for-each-ref refs/heads/multi1 refs/heads/multi2 --format='%(refname:short)' | wc -l | tr -d ' ')" "0"
+"$BIN" discard multi1 multi2 >/dev/null 2>&1
+assert_eq "discard deletes several names at once" "$(git for-each-ref refs/heads/multi1 refs/heads/multi2 --format='%(refname:short)' | wc -l | tr -d ' ')" "0"
 git branch unmerged side >/dev/null 2>&1
-if "$BIN" reap unmerged >/dev/null 2>&1; then no "reap refuses unmerged work"; else ok "reap refuses unmerged work"; fi
-"$BIN" reap unmerged -D >/dev/null 2>&1
-assert_eq "reap -D forces the delete" "$(git for-each-ref refs/heads/unmerged --format='%(refname:short)')" ""
+if "$BIN" discard unmerged >/dev/null 2>&1; then no "discard refuses unmerged work"; else ok "discard refuses unmerged work"; fi
+"$BIN" discard unmerged -f >/dev/null 2>&1
+assert_eq "discard -f forces the delete" "$(git for-each-ref refs/heads/unmerged --format='%(refname:short)')" ""
 git branch forced side >/dev/null 2>&1
-"$BIN" reap forced -D >/dev/null 2>&1
-assert_eq "reap -D drops unmerged commits" "$(git for-each-ref refs/heads/forced --format='%(refname:short)')" ""
-if "$BIN" reap tb >/dev/null 2>&1; then no "reap refuses the current branch"; else ok "reap refuses the current branch"; fi
-assert_contains "dbr is gone with a direction" "$("$BIN" dbr side 2>&1)" "gg reap"
-assert_contains "Dbr is gone with a direction" "$("$BIN" Dbr side 2>&1)" "gg reap"
-assert_contains "branch -d is gone with a direction" "$("$BIN" br -d side 2>&1)" "gg reap"
+"$BIN" discard forced -f >/dev/null 2>&1
+assert_eq "discard -f drops unmerged commits" "$(git for-each-ref refs/heads/forced --format='%(refname:short)')" ""
+if "$BIN" discard tb >/dev/null 2>&1; then no "discard refuses the current branch"; else ok "discard refuses the current branch"; fi
+assert_contains "dbr is gone with a direction" "$("$BIN" dbr side 2>&1)" "gg discard"
+assert_contains "Dbr is gone with a direction" "$("$BIN" Dbr side 2>&1)" "gg discard"
+assert_contains "branch -d is gone with a direction" "$("$BIN" br -d side 2>&1)" "gg discard"
+assert_contains "reap is gone with a direction" "$("$BIN" reap side 2>&1)" "gg discard"
+git branch keepme >/dev/null 2>&1
+assert_contains "a typed branch prefix wins" "$("$BIN" discard branch:keepme 2>&1)" "deleted"
+echo base > typed.txt
+git add typed.txt >/dev/null 2>&1
+git commit -q -m "typed"
+echo edit >> typed.txt
+typed_id=$("$BIN" st | grep ' typed.txt$' | awk '{print $2}')
+"$BIN" discard "path:$typed_id" >/dev/null 2>&1
+assert_eq "a typed path prefix drops the edit" "$(git status --porcelain)" ""
+echo again >> typed.txt
+echo new > fresh.txt
+"$BIN" discard zz >/dev/null 2>&1
+assert_eq "zz drops every edit" "$(git status --porcelain)" "?? fresh.txt"
+assert_eq "zz keeps the new file" "$(cat fresh.txt)" "new"
+assert_contains "del is the long abbreviation" "$("$BIN" help)" "discard d, del"
+
+echo "discard and the upstream"
+R=$(mktemp -d)
+git init -q --bare "$R/remote.git"
+git init -q -b main "$R/repo"
+cd "$R/repo" || exit 1
+git remote add origin "$R/remote.git"
+git commit -q --allow-empty -m init
+git push -q -u origin main
+git branch feat >/dev/null 2>&1
+git push -q -u origin feat
+"$BIN" discard feat -y >/dev/null 2>&1
+assert_contains "discard -y leaves the upstream" "$(git ls-remote --heads origin)" "refs/heads/feat"
+git branch feat2 >/dev/null 2>&1
+git push -q -u origin feat2
+"$BIN" discard feat2 -r >/dev/null 2>&1
+assert_lacks "discard -r deletes the upstream" "$(git ls-remote --heads origin)" "refs/heads/feat2"
+git branch --no-track lonely >/dev/null 2>&1
+assert_lacks "a branch with no upstream asks nothing" "$("$BIN" discard lonely -y 2>&1)" "pass -r"
 
 echo "branch stacks"
 R=$(newrepo)
@@ -1050,8 +1085,8 @@ R=$(newrepo)
 cd "$R" || exit 1
 git branch gone
 gone_sha=$(git rev-parse refs/heads/gone)
-"$BIN" reap gone >/dev/null 2>&1
-assert_eq "reap removed the branch" "$(git for-each-ref refs/heads/gone --format='%(refname)')" ""
+"$BIN" discard gone >/dev/null 2>&1
+assert_eq "discard removed the branch" "$(git for-each-ref refs/heads/gone --format='%(refname)')" ""
 "$BIN" undo >/dev/null 2>&1
 assert_eq "undo restores a deleted branch at the same sha" "$(git rev-parse refs/heads/gone)" "$gone_sha"
 assert_contains "undo lists the restored branch" "$(git branch --format='%(refname:short)')" "gone"

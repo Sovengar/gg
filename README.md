@@ -35,8 +35,9 @@ gg br -a           the stacks: each branch under the one it was cut from
 gg br -la          local and remote branches in one list
 gg br -lm          branches already merged into HEAD (br -lm main: into main)
 gg branch -c side  create a branch and switch to it (alias: cbr; branch new works too)
-gg reap side       delete a branch, its tip kept in refs/gg/deleted
-gg reap side -D    force the delete, unmerged commits and all
+gg discard side    delete a branch, its tip kept in refs/gg/deleted
+gg discard <id>    drop that commit too (git history drop)
+gg discard side -f force a delete the tree or history would refuse
 gg reflog          reflog
 gg tag             tags newest version first, with the message (alias: t)
 gg tag -m v1.2.0   create one; -d deletes, -s signs
@@ -57,7 +58,6 @@ gg amend           fold changes into HEAD
 gg amend <id>      fold changes into another commit (git history fixup)
 gg describe <id>   edit that commit's message (aliases: reword, rename, desc)
 gg split <id> -- f cut that commit in two by paths (git history split, interactive)
-gg abandon <id>    drop that commit (git history drop)
 gg revert <id>     undo that commit with a new commit, safe once published (alias: rv)
 gg uncommit        move HEAD back into the working copy, change and all
 gg uncommit <id>   same for any commit, its children replayed on its parent
@@ -141,7 +141,8 @@ gg new             or park everything in a wip commit on the branch
 ```
 
 `gg discard` drops edits and keeps the new files: a new file is not a change
-to drop. `gg clear` drops the edits and deletes the new files, since no commit
+to drop. It also takes a commit changeId or a branch changeId; see "One discard,
+three kinds". `gg clear` drops the edits and deletes the new files, since no commit
 holds them and git cannot bring one back; without `-f` it asks first, and
 refuses when nobody can answer.
 
@@ -174,8 +175,7 @@ gg wt rm side      remove it; --force when it is dirty
 gg go side         go where it lives: its worktree, or this checkout
 gg fork side       the same directory, under the verb the table uses (alias: fk)
 gg ship side       squash the branch into one commit on the target, drop its worktree
-gg reap side       remove the worktree; -k keeps the branch, -d deletes it
-gg reap --merged   sweep every branch and worktree already merged in the default
+gg discard side    remove the worktree and the branch it holds
 ```
 
 `gg st` and bare `gg` also read `wt list --format json`, so each worktree lane
@@ -212,21 +212,32 @@ gg shell uninstall  remove it
 
 Without the wrapper, `cd (gg go side)` does the same thing.
 
-`gg reap` is the only verb that removes a worktree. A branch that still has one
-gets a question: keep the branch or delete it too. When origin holds the branch,
-it asks about the remote separately; `-r` answers that in advance. Without a
-terminal it refuses instead of guessing, so answer with `-k` or `-d`.
-
-
 `gg ship` is the composing end of a branch: it turns the commits into one, replays
 it on the local target and fast-forwards it, and never pushes. `gg land` is the
 publishing end: it fast-forwards the target and pushes, and it keeps the commits.
 A draft pushed with `gg pr` stars the review path, so ship stays local on purpose.
 
-`gg reap` is the only verb that removes a worktree. A branch that still has one
-gets a question: keep the branch or delete it too. When origin holds the branch,
-it asks about the remote separately; `-r` answers that in advance. Without a
-terminal it refuses instead of guessing, so ask the question with `-k` or `-d`.
+### One discard, three kinds
+
+`gg discard` takes a changeId of any kind and drops what it names. The resolver
+types it first, so a path changeId, a commit changeId and a branch changeId
+cannot be confused; a plain name is sorted by what it is: an existing path, then
+a branch, then a commit. `path:`, `commit:` and `branch:` force one kind, and a
+token that names two kinds fails with the candidates instead of guessing.
+
+```
+gg discard kd          the edit of that path, the rest of the tree stays
+gg discard <commit>    the commit, its children replayed on its parent
+gg discard side        the branch and the worktree that holds it
+gg discard zz          every uncommitted edit, keeping new files
+```
+
+The price of each kind is asked for with the same flags: `-f` drops unmerged
+commits or a dirty worktree, `-y` skips the questions, `-r` also deletes the
+upstream copy. A branch that tracks an upstream asks about it, naming the remote
+it actually tracks; a branch with no upstream never asks. A worktree goes only
+when its question is answered: `gg undo` restores refs, not another directory.
+
 ### ChangeIds
 
 Every file, commit and branch in gg carries a changeId: two to four
@@ -257,13 +268,13 @@ gg diff @na        resolves, then diffs
 
 When the commit is the tip of a local branch the branch name is used, so
 `gg br @nan` switches to the branch rather than to a detached HEAD. Branch
-verbs (`gg go`, `gg br`, `gg cbr`, `gg reap`, `gg merge`, `gg rb`) read a branch changeId
+verbs (`gg go`, `gg br`, `gg cbr`, `gg discard`, `gg merge`, `gg rb`) read a branch changeId
 first, so `gg br 4d` names the branch even when another branch holds the same
 commit.
 
 ### Branch list after a delete
 
-`gg reap` ends with the branch list it just changed: the five newest branches
+`gg discard` of a branch ends with the branch list it just changed: the five newest branches
 and the default branch, always. The default branch is the one `origin/HEAD`
 points at, else `main`, `master`, `trunk` or `develop`, else the current branch.
 
@@ -361,11 +372,11 @@ removals and green additions. When stdout is not a terminal it runs plain
 ### Built on git history
 
 Git 2.56 ships the experimental `git history` command. gg uses it when present
-and falls back to `git rebase --onto` for `abandon`:
+and falls back to `git rebase --onto` for `gg discard <commit>`:
 
 | gg | git |
 |---|---|
-| `gg abandon <id>` | `git history drop <id>` |
+| `gg discard <id>` | `git history drop <id>` |
 | `gg amend <id>` | `git history fixup <id>` |
 | `gg describe <id>` | `git history reword <id>` |
 | `gg split <id>` | `git history split <id>` |
