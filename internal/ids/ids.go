@@ -60,6 +60,7 @@ func MintLen() int {
 // Index maps changeIDs to commits for the current repository.
 type Index struct {
 	changeIDs map[string]string   // sha -> changeId
+	raws      map[string]string   // sha -> full reverse-hex identity
 	byToken   map[string]string   // token -> sha, only unique prefixes
 	ambig     map[string][]string // token -> shas, when not unique
 }
@@ -97,6 +98,7 @@ func Load() (*Index, error) {
 	owners := prefixOwners(raws)
 
 	ix := &Index{
+		raws:      raws,
 		changeIDs: make(map[string]string, len(raws)),
 		byToken:   make(map[string]string, len(owners)),
 		ambig:     make(map[string][]string),
@@ -116,6 +118,35 @@ func Load() (*Index, error) {
 		}
 	}
 	return ix, nil
+}
+
+// Raws is the full identity of every commit in the index, keyed by sha.
+func (ix *Index) Raws() map[string]string { return ix.raws }
+
+// AssignShort mints one short id per raw identity so that no token is shared by
+// two entries and no reserved token is handed out. It is the single namespace
+// commits, branches and files share.
+func AssignShort(raws map[string]string, reserved map[string]bool) map[string]string {
+	owners := map[string]int{}
+	for _, raw := range raws {
+		for n := MintLen(); n <= len(raw); n++ {
+			owners[raw[:n]]++
+		}
+	}
+	out := make(map[string]string, len(raws))
+	for key, raw := range raws {
+		for n := MintLen(); n <= len(raw); n++ {
+			token := raw[:n]
+			if owners[token] == 1 && !reserved[token] {
+				out[key] = token
+				break
+			}
+		}
+		if out[key] == "" {
+			out[key] = raw
+		}
+	}
+	return out
 }
 
 // RawChangeID hashes an identity key into the full reverse-hex width.

@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"gg/internal/gitx"
-	"gg/internal/ids"
+	"gg/internal/idmap"
 	"gg/internal/ui"
 )
 
@@ -29,7 +29,7 @@ const pushedLimit = "5000"
 
 // renderer holds everything a line needs to be drawn.
 type renderer struct {
-	idx    *ids.Index
+	short  func(sha string) string
 	long   bool
 	pushed map[string]bool
 }
@@ -134,11 +134,11 @@ func (l limits) logArgs(extras []string) []string {
 }
 
 func newRenderer(long bool) *renderer {
-	idx, err := ids.Load()
-	if err != nil {
-		idx = &ids.Index{}
+	return &renderer{
+		short:  idmap.Shared().CommitDisplay,
+		long:   long,
+		pushed: PushedSet(),
 	}
-	return &renderer{idx: idx, long: long, pushed: PushedSet()}
 }
 
 // PushedSet collects every commit reachable from a remote-tracking branch.
@@ -260,7 +260,7 @@ func (r *renderer) tail(fields []string) string {
 	}
 
 	var b strings.Builder
-	b.WriteString(ui.Red(r.idx.ChangeID(sha)))
+	b.WriteString(r.short(sha))
 	b.WriteString(" ")
 	b.WriteString(ui.Dim(shown))
 	b.WriteString(" ")

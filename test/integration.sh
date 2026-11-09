@@ -296,7 +296,7 @@ cd "$R" || exit 1
 echo hi > f.txt
 changeId=$("$BIN" log 1 | awk '{print $2}')
 case "$changeId" in
-?|??|???|????) ok "log shows a bare changeId" ;;
+[k-z]*) ok "log shows the changeId in full" ;;
 *) no "log shows a bare changeId (got: $changeId)" ;;
 esac
 assert_contains "changeId resolves the changeId" "$("$BIN" changeId "$changeId")" "$changeId"
@@ -882,7 +882,7 @@ git commit -q -m base
 sed -i 's/^line5$/X5/' h.txt
 sed -i 's/^line25$/X25/' h.txt
 fid=$("$BIN" st | grep ' h.txt$' | awk '{print $2}')
-case "${#fid}" in 1|2|3|4) ok "a dirty file changeId is short" ;; *) no "a dirty file changeId is short (got ${#fid})" ;; esac
+case "$fid" in [k-z]*) ok "a dirty file shows its changeId" ;; *) no "a dirty file shows its changeId (got $fid)" ;; esac
 if command -v script >/dev/null 2>&1; then
 	handles=$(script -qec "$BIN diff" /dev/null 2>/dev/null \
 		| sed -e 's/\x1b\[[0-9;]*m//g' | grep -oE '^[k-z]+:[0-9a-f]{1,8}' | head -2)
@@ -893,6 +893,21 @@ if command -v script >/dev/null 2>&1; then
 	assert_eq "discard drops one hunk only" "$(git diff --numstat | awk '{print $1}')" "1"
 fi
 assert_contains "a stale hunk handle changes nothing" "$("$BIN" discard "$fid:zz" 2>&1)" "no hunk"
+
+echo "one changeId space"
+R=$(newrepo)
+cd "$R" || exit 1
+git branch other >/dev/null 2>&1
+echo edit > tracked.txt
+git add tracked.txt >/dev/null 2>&1
+git commit -q -m base
+echo more >> tracked.txt
+echo fresh > new.txt
+commits=$(NO_COLOR=1 "$BIN" log 20 | awk '{print $2}')
+files=$("$BIN" st | grep -E '^┊   ' | awk '{print $2}')
+dup=$(printf '%s\n%s\n' "$commits" "$files" | sort | uniq -d)
+assert_eq "commits and files share no token" "$dup" ""
+assert_eq "a commit keeps one id across views" "$("$BIN" id | awk '{print $1}')" "$(NO_COLOR=1 "$BIN" log 1 | awk '{print $2}')"
 
 echo "a staged new file is not a discard"
 R=$(newrepo)

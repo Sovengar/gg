@@ -11,8 +11,22 @@ import (
 
 	"gg/internal/files"
 	"gg/internal/gitx"
+	"gg/internal/idmap"
 	"gg/internal/ui"
 )
+
+// hunkLabel draws a hunk id: the unique prefix red, padded to two characters in
+// grey so the handle keeps the file:hunk shape.
+func hunkLabel(h files.Hunk) string {
+	end := len(h.ID)
+	if end < 2 {
+		end = 2
+	}
+	if end > len(h.Full) {
+		end = len(h.Full)
+	}
+	return ui.Red(h.ID) + ui.Dim(h.Full[len(h.ID):end])
+}
 
 // splitArgs separates the flags from the revisions, so a flag such as -w still
 // describes the working tree while a revision names committed history.
@@ -140,9 +154,9 @@ func atoiOr(s string, fallback int) int {
 
 // render draws every file as a stack of boxes.
 func render(diffs []*fileDiff, handles bool, flags ...string) {
-	fidx := files.Load()
+	fidx := idmap.Shared()
 	for _, f := range diffs {
-		handle := fidx.ChangeID(f.path)
+		handle := fidx.File(f.path)
 		var hunks []files.Hunk
 		if handles {
 			hunks = files.HunksOf(f.path, contextLines, flags...)
@@ -159,12 +173,14 @@ func render(diffs []*fileDiff, handles bool, flags ...string) {
 				continue
 			}
 			// the handle names the region: file changeId, colon, hunk id
-			id := handle
+			plainID := handle
+			paintedID := idmap.Shared().FileDisplay(f.path)
 			if handles && i < len(hunks) {
-				id = handle + ":" + hunks[i].ID
+				plainID = handle + ":" + hunks[i].ID
+				paintedID = paintedID + ":" + hunkLabel(hunks[i])
 			}
-			plain := strings.TrimSpace(id + " " + f.path)
-			painted := strings.TrimSpace(ui.Red(id) + " " + f.path)
+			plain := strings.TrimSpace(plainID + " " + f.path)
+			painted := strings.TrimSpace(paintedID + " " + f.path)
 			box(plain, painted, h.rows())
 		}
 	}

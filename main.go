@@ -9,8 +9,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"gg/internal/files"
 	"gg/internal/gitx"
+	"gg/internal/idmap"
 	"gg/internal/ids"
 	"gg/internal/oplog"
 	"gg/internal/ops"
@@ -26,16 +26,6 @@ const (
 	modeExec mode = iota
 	modePrint
 )
-
-// index is loaded once per run and reused by changeIDs and the footer.
-var index = &ids.Index{}
-
-func changeIndex() *ids.Index {
-	if ix, err := ids.Load(); err == nil {
-		index = ix
-	}
-	return index
-}
 
 func main() {
 	os.Exit(run(os.Args[1:]))
@@ -125,8 +115,9 @@ var dataFlags = map[string]bool{
 	"-t": true, "--template": true, "-x": true, "--exec": true,
 }
 
-// resolveArgs replaces changeId-shaped arguments with the commit or branch they
-// name. Real refs and existing paths win over changeIDs.
+// resolveArgs replaces changeId-shaped arguments with the thing they name. Real
+// refs and existing paths win over changeIDs. Every kind shares one namespace,
+// so a token names one thing and the verb never has to guess.
 func resolveArgs(name string, args []string) ([]string, int) {
 	out := make([]string, len(args))
 	skipNext := false
@@ -155,14 +146,11 @@ func resolveArgs(name string, args []string) ([]string, int) {
 			out[i] = a
 			continue
 		}
+		token := strings.TrimPrefix(a, "@")
 		if branchVerb(name) && !isRef(a) {
-			// a branch changeId names the branch itself, not the commit it points at
-			switch bname, st := branchIndex().Resolve(strings.TrimPrefix(a, "@")); st {
-			case ids.Resolved:
-				out[i] = bname
+			if branch, ok := idmap.Shared().BranchBy(token); ok {
+				out[i] = branch
 				continue
-			case ids.Ambiguous:
-				return out, 2
 			}
 		}
 		if anyVerb(name) && !isRef(a) && !isPath(a) {
@@ -173,31 +161,21 @@ func resolveArgs(name string, args []string) ([]string, int) {
 			out[i] = typed
 			continue
 		}
-		if !ids.Shaped(strings.TrimPrefix(a, "@")) || isRef(a) || isPath(a) {
+		if !ids.Shaped(token) || isRef(a) || isPath(a) {
 			out[i] = a
 			continue
 		}
-		// a path verb reads a file id first: with one-character ids a file and a
-		// commit can share a token, and only the verb knows which one it wants
 		if pathVerb(name) {
-			if path, ok := fileIndex().Resolve(strings.TrimPrefix(a, "@")); ok {
+			if path, ok := idmap.Shared().FileBy(token); ok {
 				out[i] = path
 				continue
 			}
 		}
-		ref, status := changeIndex().Resolve(a)
-		switch status {
-		case ids.Resolved:
-			if ref.Branch != "" {
-				out[i] = ref.Branch
-			} else {
-				out[i] = ref.SHA
-			}
-		case ids.Ambiguous:
-			return out, 2
-		default:
-			out[i] = a
+		if sha, ok := idmap.Shared().CommitBy(token); ok {
+			out[i] = sha
+			continue
 		}
+		out[i] = a
 	}
 	return out, 0
 }
@@ -208,8 +186,7 @@ var anyVerbs = map[string]bool{"discard": true}
 func anyVerb(name string) bool { return anyVerbs[name] }
 
 // resolveAny types the argument so the verb knows what it names. The kind
-// prefixes path:, commit: and branch: force one kind. A token that names two
-// kinds fails instead of guessing.
+// prefixes path:, commit: and branch: force one kind.
 func resolveAny(arg string) (string, int) {
 	a := strings.TrimPrefix(arg, "@")
 	for _, kind := range []string{"path", "commit", "branch"} {
@@ -223,37 +200,21 @@ func resolveAny(arg string) (string, int) {
 		return a, 0
 	}
 	if fileID, hunkID, ok := strings.Cut(a, ":"); ok && hunkID != "" {
-		if path, found := fileIndex().Resolve(fileID); found {
+		if path, found := idmap.Shared().FileBy(fileID); found {
 			return "hunk:" + path + ":" + hunkID, 0
 		}
 	}
-	if paths := fileIndex().Ambiguous(a); len(paths) > 0 {
-		ui.Errf("gg discard: %s names %d paths: %s", a, len(paths), strings.Join(paths, " "))
-		ui.Errf("gg discard: write the kind and the full path, or one path changeId")
-		return "", 2
+	if path, ok := idmap.Shared().FileBy(a); ok {
+		return "path:" + path, 0
 	}
-	var hits []string
-	if path, ok := fileIndex().Resolve(a); ok {
-		hits = append(hits, "path:"+path)
+	if branch, ok := idmap.Shared().BranchBy(a); ok {
+		return "branch:" + branch, 0
 	}
-	if branch, status := branchIndex().Resolve(a); status == ids.Resolved {
-		hits = append(hits, "branch:"+branch)
-	} else if status == ids.Ambiguous {
-		return "", 2
+	if sha, ok := idmap.Shared().CommitBy(a); ok {
+		return "commit:" + sha, 0
 	}
-	switch len(hits) {
-	case 1:
-		return hits[0], 0
-	case 2:
-		ui.Errf("gg discard: %s names more than one thing: %s", a, strings.Join(hits, ", "))
-		ui.Errf("gg discard: write the kind, for example %s", hits[0])
-		return "", 2
-	}
-	if sha, status := changeIndex().Resolve(a); status == ids.Resolved {
-		return "commit:" + sha.SHA, 0
-	}
-	if root, ok := kindValue("commit", a); ok {
-		return "commit:" + root, 0
+	if sha, ok := kindValue("commit", a); ok {
+		return "commit:" + sha, 0
 	}
 	return a, 0
 }
@@ -271,46 +232,23 @@ func resolveKind(kind, name string) string {
 func kindValue(kind, name string) (string, bool) {
 	switch kind {
 	case "path":
-		return fileIndex().Resolve(name)
+		return idmap.Shared().FileBy(name)
 	case "branch":
-		if b, status := branchIndex().Resolve(name); status == ids.Resolved {
+		if b, ok := idmap.Shared().BranchBy(name); ok {
 			return b, true
 		}
 		if _, err := gitx.Output("rev-parse", "--verify", "--quiet", "refs/heads/"+name); err == nil {
 			return name, true
 		}
 	case "commit":
-		if ref, status := changeIndex().Resolve(name); status == ids.Resolved {
-			return ref.SHA, true
+		if sha, ok := idmap.Shared().CommitBy(name); ok {
+			return sha, true
 		}
 		if sha, err := gitx.Output("rev-parse", "--verify", "--quiet", name+"^{commit}"); err == nil && sha != "" {
 			return sha, true
 		}
 	}
 	return "", false
-}
-
-var fileIdx *files.Index
-
-var brIdx *ids.BranchIndex
-
-func branchIndex() *ids.BranchIndex {
-	if brIdx != nil {
-		return brIdx
-	}
-	ix, err := ids.LoadBranches()
-	if err != nil {
-		ix = &ids.BranchIndex{}
-	}
-	brIdx = ix
-	return brIdx
-}
-
-func fileIndex() *files.Index {
-	if fileIdx == nil {
-		fileIdx = files.Load()
-	}
-	return fileIdx
 }
 
 // pathVerbs are the only verbs where a file changeId may replace an argument.
@@ -523,7 +461,7 @@ func footer(verb string) {
 			behind = strconv.Itoa(n)
 		}
 	}
-	fmt.Println(ui.Dim(fmt.Sprintf("  %s · ahead %s · behind %s", changeIndex().Short(sha), ahead, behind)))
+	fmt.Println(ui.Dim(fmt.Sprintf("  %s · ahead %s · behind %s", shortCommit(sha), ahead, behind)))
 }
 
 // help renders the table the word and the flags ask for. Each -v opens the
@@ -818,7 +756,7 @@ func termWidth() int {
 func showIDs(args []string) int {
 	if len(args) == 0 {
 		if sha, ok := gitx.Head(); ok {
-			fmt.Printf("%s\n", changeIndex().Short(sha))
+			fmt.Printf("%s\n", shortCommit(sha))
 			return 0
 		}
 		ui.Errf("gg: no commits yet")
@@ -826,19 +764,38 @@ func showIDs(args []string) int {
 	}
 	rc := 0
 	for _, a := range args {
-		ref, status := changeIndex().Resolve(a)
-		if status != ids.Resolved {
+		sha, ok := idmap.Shared().CommitBy(strings.TrimPrefix(a, "@"))
+		if !ok {
 			ui.Errf("gg: %s matches no single commit", a)
 			rc = 1
 			continue
 		}
-		line := fmt.Sprintf("%s %s", changeIndex().ChangeID(ref.SHA), ref.SHA)
-		if ref.Branch != "" {
-			line += "  (" + ref.Branch + ")"
+		line := fmt.Sprintf("%s %s", idmap.Shared().CommitPlain(sha), sha)
+		if branch := branchAt(sha); branch != "" {
+			line += "  (" + branch + ")"
 		}
 		fmt.Println(line)
 	}
 	return rc
+}
+
+// shortCommit is a changeId and the short sha, the shape every footer uses.
+func shortCommit(sha string) string {
+	id := idmap.Shared().CommitPlain(sha)
+	if len(sha) > 7 {
+		sha = sha[:7]
+	}
+	return id + " " + sha
+}
+
+// branchAt names a local branch that points at the sha, for the id verb.
+func branchAt(sha string) string {
+	out, err := gitx.Output("for-each-ref", "--points-at", sha, "refs/heads", "--format=%(refname:short)")
+	if err != nil {
+		return ""
+	}
+	name, _, _ := strings.Cut(out, "\n")
+	return name
 }
 
 func quote(args []string) string {

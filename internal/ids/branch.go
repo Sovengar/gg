@@ -14,6 +14,7 @@ import (
 // branch you mean.
 type BranchIndex struct {
 	changeIDs map[string]string   // branch -> changeId
+	raws      map[string]string   // branch -> full reverse-hex identity
 	byToken   map[string]string   // token -> branch, only unique prefixes
 	ambig     map[string][]string // token -> branches, when not unique
 }
@@ -37,6 +38,7 @@ func LoadBranches() (*BranchIndex, error) {
 	owners := prefixOwners(raws)
 
 	ix := &BranchIndex{
+		raws:      raws,
 		changeIDs: make(map[string]string, len(raws)),
 		byToken:   make(map[string]string, len(owners)),
 		ambig:     make(map[string][]string),
@@ -60,6 +62,9 @@ func LoadBranches() (*BranchIndex, error) {
 	}
 	return ix, nil
 }
+
+// Raws is the full identity of every branch in the index, keyed by name.
+func (ix *BranchIndex) Raws() map[string]string { return ix.raws }
 
 // ChangeID returns the branch changeId, or a name-derived one for a branch that is
 // not in the index.

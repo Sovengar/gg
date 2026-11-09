@@ -261,9 +261,14 @@ and four when an agent runs the command.
   commit never share it.
 - A dirty path takes its changeId from the path.
 
-A changeId names one thing inside its own kind, so a file id and a commit id may
-coincide; the verb decides which one it reads, and `gg discard` names both
-candidates instead of guessing. In practice:
+Every kind shares one namespace, so a token names exactly one thing: a commit, a
+branch or a dirty path, never two. A line draws three characters of the id, the
+way but does, and paints only the ones that disambiguate it red; the rest of
+those three is grey. The full reverse-hex value is still the identity, and any
+unique prefix of it resolves. The tree, the log and the diff print the same
+token for the same object, and a verb never has to guess which kind it read.
+`zz` is reserved for the whole uncommitted area and is never handed out. In
+practice:
 
 ```
 * @nan 641682b (2 minutes ago) chore: dev env  (HEAD -> trunk) [Playground]

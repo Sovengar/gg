@@ -14,7 +14,8 @@ import (
 // namespace, so the full handle reads `fileId:hunkId`, and Patch reverts only
 // this region.
 type Hunk struct {
-	ID    string
+	ID    string // the unique prefix
+	Full  string // the whole content hash
 	Patch string
 }
 
@@ -41,7 +42,8 @@ func split(diff string) []Hunk {
 			return
 		}
 		patch := strings.Join(append(append([]string{}, header...), body...), "\n") + "\n"
-		hunks = append(hunks, Hunk{ID: hunkID(patch), Patch: patch})
+		id := hunkID(patch)
+		hunks = append(hunks, Hunk{ID: id, Full: id, Patch: patch})
 		body = nil
 	}
 	for _, line := range strings.Split(diff, "\n") {
