@@ -173,6 +173,12 @@ gg wt ls           branch, path, and how dirty each worktree is
 gg wt rm side      remove it; --force when it is dirty
 ```
 
+`gg st` and bare `gg` also read `wt list --format json`, so each worktree lane
+carries what Worktrunk knows: `↑N` commits the main branch lacks, `↓N` commits
+it already has, `⚑` changes in that worktree's tree. With a single worktree
+there is nothing to compare, so gg skips the call; without the `wt` binary the
+markers disappear and nothing else changes.
+
 ### ChangeIds
 
 Every file, commit and branch in gg carries a changeId: two to four

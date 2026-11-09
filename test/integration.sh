@@ -784,6 +784,20 @@ assert_contains "wt new folds the edit into the wip" "$(git -C "$side" show HEAD
 assert_eq "wt new leaves the main tree clean" "$(git status --porcelain)" ""
 "$BIN" wt rm side >/dev/null 2>&1
 
+echo "the tree reads worktree drift from Worktrunk"
+if command -v wt >/dev/null 2>&1; then
+	R=$(mktemp -d)
+	(cd "$R" && git init -q -b main . && git commit -q --allow-empty -m init)
+	cd "$R" || exit 1
+	side="$(dirname "$R")/$(basename "$R").side"
+	"$BIN" wt new side >/dev/null 2>&1
+	git -C "$side" -c user.email=a@b -c user.name=a commit -q --allow-empty -m side1
+	echo dirty > "$side/x.txt"
+	assert_contains "st marks a dirty worktree" "$("$BIN" st)" "⚑"
+	assert_contains "st marks the drift from main" "$("$BIN" st)" "↑1"
+	"$BIN" wt rm side --force >/dev/null 2>&1
+fi
+
 echo "commit and discard by changeId"
 R=$(newrepo)
 cd "$R" || exit 1
