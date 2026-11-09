@@ -11,10 +11,6 @@ import (
 )
 
 // MinLen and MaxLen bound a file changeId.
-const (
-	MinLen = 2
-	MaxLen = 4
-)
 
 // Index maps changeIDs to paths for the current working tree.
 type Index struct {
@@ -43,9 +39,9 @@ func Load() *Index {
 
 	owners := map[string][]string{}
 	for _, p := range paths {
-		raw := ids.RawChangeID("file:" + p)
+		raw := fileRaw(p)
 		ix.changeIDs[p] = raw
-		for n := MinLen; n <= MaxLen; n++ {
+		for n := ids.MintLen(); n <= ids.MaxLen && n <= len(raw); n++ {
 			owners[raw[:n]] = append(owners[raw[:n]], p)
 		}
 	}
@@ -63,6 +59,18 @@ func Load() *Index {
 		}
 	}
 	return ix
+}
+
+// fileRaw is the reverse-hex identity of a path. A path made only of k..z is
+// spelled in front, the way but keeps a name-derived id readable.
+func fileRaw(path string) string {
+	raw := ids.RawChangeID("file:" + path)
+	for _, r := range path {
+		if r < 'k' || r > 'z' {
+			return raw
+		}
+	}
+	return path + raw
 }
 
 // ChangeID returns the changeId for a path, or "" when the path is clean.

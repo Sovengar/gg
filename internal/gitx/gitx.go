@@ -37,6 +37,15 @@ func quoted(args []string) []string {
 	return append(out, args...)
 }
 
+// RunStdin runs git with input on its stdin, inherited stdio otherwise.
+func RunStdin(input string, args ...string) int {
+	cmd := exec.Command("git", args...)
+	cmd.Stdin = strings.NewReader(input)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return exitCode(cmd.Run())
+}
+
 // Output runs git and returns trimmed stdout.
 func Output(args ...string) (string, error) {
 	cmd := exec.Command("git", quoted(args)...)

@@ -5,11 +5,14 @@
 // trailer fall back to a changeId derived from their sha, which does change when
 // the commit is rewritten.
 //
-// changeIds are the shortest unique prefix, never shorter than two characters.
+// changeIds are the reverse hex but uses: the characters k to z, where k is 15
+// and z is 0. A changeId is the shortest unique prefix of that string, minted at
+// one character for a human and four when an agent runs the command.
 package ids
 
 import (
 	"crypto/sha256"
+	"os"
 	"sort"
 	"strings"
 
@@ -17,14 +20,42 @@ import (
 	"gg/internal/ui"
 )
 
-// alphabet avoids characters that are easy to confuse when typed.
-const alphabet = "abcdefghijkmnpqrstuvwxyz23456789"
+// alphabet is reverse hex, the scheme but, jj and Gerrit share: k is 15 and z is
+// 0. Only these sixteen letters appear in a changeId.
+const alphabet = "klmnopqrstuvwxyz"
 
-// MinLen and MaxLen bound a changeId.
 const (
-	MinLen = 2
-	MaxLen = 4
+	// MinLen is the width a changeId starts with for a human.
+	MinLen = 1
+	// AgentMinLen is the width it starts with when an agent runs the command,
+	// so a printed changeId does not shorten while the agent still uses it.
+	AgentMinLen = 4
+	// MaxLen is the full reverse-hex width, and the cap for a typed prefix.
+	MaxLen = 32
 )
+
+// agentVars are the environment variables but reads to tell an agent apart from
+// a human.
+var agentVars = []string{
+	"CLAUDECODE", "CLAUDE_CODE", "CLAUDE_CODE_IS_COWORK",
+	"CODEX_SHELL", "CURSOR_AGENT", "GEMINI_CLI", "COPILOT_AGENT",
+	"AUGMENT_AGENT", "REPL_ID", "JUNIE_DATA", "OPENCODE_CLIENT",
+	"ANTIGRAVITY_AGENT", "GOOSE_TERMINAL", "AMP", "CRUSH",
+	"GROK_AGENT", "DEVIN", "QWEN_CODE", "KILO_CODE", "TABNINE_CLI",
+	"AMAZONQ_DEVELOPER", "CODEBUDDY_AGENT", "OPENHANDS", "OPEN_CLAW",
+	"HERMES_AGENT", "DIRAC", "PIPER",
+}
+
+// MintLen is the width a freshly minted changeId starts with: one character for
+// a human, four under an agent.
+func MintLen() int {
+	for _, name := range agentVars {
+		if os.Getenv(name) != "" {
+			return AgentMinLen
+		}
+	}
+	return MinLen
+}
 
 // Index maps changeIDs to commits for the current repository.
 type Index struct {
@@ -87,15 +118,19 @@ func Load() (*Index, error) {
 	return ix, nil
 }
 
-// Raw hashes an identity key into alphabet characters.
+// RawChangeID hashes an identity key into the full reverse-hex width.
 func RawChangeID(key string) string {
 	sum := sha256.Sum256([]byte(key))
 	var b strings.Builder
-	for i := 0; i < MaxLen; i++ {
-		b.WriteByte(alphabet[int(sum[i])%len(alphabet)])
+	for i := 0; i < MaxLen/2; i++ {
+		b.WriteByte(reverseHex(sum[i] >> 4))
+		b.WriteByte(reverseHex(sum[i] & 0x0f))
 	}
 	return b.String()
 }
+
+// reverseHex renders one nibble the way but does: z is 0, k is 15.
+func reverseHex(nibble byte) byte { return 'z' - (nibble & 0x0f) }
 
 // ChangeID returns the changeId for a sha, or a sha-derived one when the commit is
 // not in the index.

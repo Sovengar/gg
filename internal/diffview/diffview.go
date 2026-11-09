@@ -14,6 +14,23 @@ import (
 	"gg/internal/ui"
 )
 
+// splitArgs separates the flags from the revisions, so a flag such as -w still
+// describes the working tree while a revision names committed history.
+func splitArgs(args []string) (flags, revisions []string) {
+	for _, a := range args {
+		if strings.HasPrefix(a, "-") {
+			flags = append(flags, a)
+			continue
+		}
+		revisions = append(revisions, a)
+	}
+	return flags, revisions
+}
+
+// contextLines is how many unchanged lines each hunk shows, and it must match
+// the value files.HunksOf reads so the printed hunk id names the same region.
+const contextLines = 3
+
 // Run draws the diff of the working tree. When stdout is not a terminal it
 // falls back to plain git diff, so pipes and scripts still parse.
 func Run(args []string) int {
@@ -24,7 +41,10 @@ func Run(args []string) int {
 	if err != nil || len(out) == 0 {
 		return 0
 	}
-	render(parse(out))
+	// a revision argument reads committed history, so its regions are not
+	// hunks any verb can act on; flags such as -w still describe the tree
+	flags, revisions := splitArgs(args)
+	render(parse(out), len(revisions) == 0, flags...)
 	return 0
 }
 
@@ -119,21 +139,32 @@ func atoiOr(s string, fallback int) int {
 }
 
 // render draws every file as a stack of boxes.
-func render(diffs []*fileDiff) {
+func render(diffs []*fileDiff, handles bool, flags ...string) {
 	fidx := files.Load()
 	for _, f := range diffs {
 		handle := fidx.ChangeID(f.path)
-		plain := strings.TrimSpace(handle + " " + f.path)
-		painted := strings.TrimSpace(ui.Red(handle) + " " + f.path)
+		var hunks []files.Hunk
+		if handles {
+			hunks = files.HunksOf(f.path, contextLines, flags...)
+		}
 
 		if f.binary {
-			box(plain, painted, []string{ui.Dim("   Binary file")})
+			box(strings.TrimSpace(handle+" "+f.path),
+				strings.TrimSpace(ui.Red(handle)+" "+f.path),
+				[]string{ui.Dim("   Binary file")})
 			continue
 		}
-		for _, h := range f.hunks {
+		for i, h := range f.hunks {
 			if len(h.lines) == 0 {
 				continue
 			}
+			// the handle names the region: file changeId, colon, hunk id
+			id := handle
+			if handles && i < len(hunks) {
+				id = handle + ":" + hunks[i].ID
+			}
+			plain := strings.TrimSpace(id + " " + f.path)
+			painted := strings.TrimSpace(ui.Red(id) + " " + f.path)
 			box(plain, painted, h.rows())
 		}
 	}
