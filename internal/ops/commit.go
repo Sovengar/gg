@@ -188,6 +188,13 @@ func tracked(path string) bool {
 	return err == nil
 }
 
+// inHead reports whether HEAD holds the path. Restoring such a path from HEAD
+// cannot delete content that no commit keeps.
+func inHead(path string) bool {
+	_, err := gitx.Output("cat-file", "-e", "HEAD:"+path)
+	return err == nil
+}
+
 // Clear drops every edit and deletes the new files, so the tree matches HEAD.
 // No commit holds a new file, so git cannot bring one back: it asks first,
 // and -f skips the question.
@@ -215,13 +222,28 @@ func Clear(args []string) int {
 	return gitx.Run("clean", "-f", "-d")
 }
 
-// untracked lists the new files git would delete, one per line.
+// untracked lists every new path git would delete: the files it never saw and
+// the ones staged as additions, which a reset --hard removes without a word.
 func untracked() []string {
-	out, err := gitx.Output("ls-files", "--others", "--exclude-standard")
-	if err != nil {
-		return nil
+	seen := map[string]bool{}
+	var out []string
+	for _, args := range [][]string{
+		{"ls-files", "--others", "--exclude-standard"},
+		{"diff", "--cached", "--name-only", "--diff-filter=A"},
+	} {
+		list, err := gitx.Output(args...)
+		if err != nil {
+			continue
+		}
+		for _, p := range strings.Fields(list) {
+			if p == "" || seen[p] {
+				continue
+			}
+			seen[p] = true
+			out = append(out, p)
+		}
 	}
-	return strings.Fields(out)
+	return out
 }
 
 // confirmClear asks before deleting new paths, which no commit holds.

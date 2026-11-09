@@ -95,7 +95,7 @@ func (ix *BranchIndex) Resolve(token string) (string, Status) {
 func prefixOwners(raws map[string]string) map[string]map[string]bool {
 	owners := make(map[string]map[string]bool)
 	for name, raw := range raws {
-		for n := MinLen; n <= MaxLen; n++ {
+		for n := MintLen(); n <= MaxLen; n++ {
 			p := raw[:n]
 			if owners[p] == nil {
 				owners[p] = make(map[string]bool)
@@ -108,7 +108,7 @@ func prefixOwners(raws map[string]string) map[string]map[string]bool {
 
 // shortestChangeID is the shortest prefix of raw that names one owner only.
 func shortestChangeID(owners map[string]map[string]bool, raw string) string {
-	for n := MinLen; n <= MaxLen; n++ {
+	for n := MintLen(); n <= MaxLen; n++ {
 		if len(owners[raw[:n]]) == 1 {
 			return raw[:n]
 		}

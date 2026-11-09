@@ -135,9 +135,18 @@ takes changeIds and the index stays git's business:
 ```
 gg dash            kd M docs/README.md, px ?? notes.md
 gg c -m "docs" kd  commit one path, leave px dirty
-gg discard kd      drop a change, keep the rest
+gg discard kdm     drop a change, keep the rest
 gg clear           drop every edit, then delete the new files
 gg new             or park everything in a wip commit on the branch
+```
+
+A dirty path also carries its hunks: each region of the diff gets a two or three
+character id, and the handle is `file:hunk`. `gg diff` prints one box per hunk
+with that handle, and `gg discard <file>:<hunk>` drops only that region.
+
+```
+gg diff            kdm:6a docs/README.md, kdm:89 docs/README.md
+gg discard kdm:6a  drop that hunk, keep the other one
 ```
 
 `gg discard` drops edits and keeps the new files: a new file is not a change
@@ -240,8 +249,8 @@ when its question is answered: `gg undo` restores refs, not another directory.
 
 ### ChangeIds
 
-Every file, commit and branch in gg carries a changeId: two to four
-characters that name it.
+Every file, commit and branch in gg carries a changeId: three characters that
+name it, growing to four when two of them share all three.
 
 - A commit takes its changeId from the `Change-Id` trailer, so an amend, a
   rebase or a squash keeps the same changeId while the sha changes. A commit
@@ -250,7 +259,7 @@ characters that name it.
   commit never share it.
 - A dirty path takes its changeId from the path.
 
-A changeId is the shortest unique prefix, never shorter than two characters:
+A changeId is the shortest unique prefix, never shorter than three characters:
 
 ```
 * @nan 641682b (2 minutes ago) chore: dev env  (HEAD -> trunk) [Playground]

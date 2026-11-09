@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"gg/internal/files"
 	"gg/internal/gitx"
 	"gg/internal/ui"
 )
@@ -67,6 +68,10 @@ func Discard(args []string) int {
 				continue
 			}
 			ui.Errf("gg discard: dropped commit %s", abbrev(name))
+		case "hunk":
+			if code := discardHunk(name); code != 0 {
+				rc = code
+			}
 		case "branch":
 			code, gone := discardBranch(name, force, yes, remote)
 			if code != 0 {
@@ -94,7 +99,7 @@ func Discard(args []string) int {
 // discardKind reads the typed prefix the resolver wrote, then sorts a plain
 // name by what it is: an existing path wins, then a branch, then a commit.
 func discardKind(item string) (string, string) {
-	for _, prefix := range []string{"path:", "commit:", "branch:"} {
+	for _, prefix := range []string{"path:", "commit:", "branch:", "hunk:"} {
 		if rest, ok := strings.CutPrefix(item, prefix); ok {
 			return strings.TrimSuffix(prefix, ":"), rest
 		}
@@ -129,12 +134,40 @@ func isSha(token string) bool {
 	return true
 }
 
+// discardHunk reverses one region of one path. A hunk id is not stable across
+// edits, so a stale handle names nothing and nothing changes.
+func discardHunk(spec string) int {
+	i := strings.LastIndex(spec, ":")
+	if i < 0 {
+		ui.Errf("gg discard: %s is not a hunk handle", spec)
+		return 2
+	}
+	path, id := spec[:i], spec[i+1:]
+	var found *files.Hunk
+	for _, h := range files.HunksOf(path, 3) {
+		if h.ID == id {
+			found = &h
+			break
+		}
+	}
+	if found == nil {
+		ui.Errf("gg discard: no hunk %s in %s. Run gg diff for the live handles.", id, path)
+		return 1
+	}
+	if rc := gitx.RunStdin(found.Patch, "apply", "-R", "--whitespace=nowarn", "-"); rc != 0 {
+		ui.Errf("gg discard: the hunk no longer applies to %s", path)
+		return rc
+	}
+	ui.Errf("gg discard: dropped hunk %s of %s", id, path)
+	return 0
+}
+
 // discardPaths drops the edits of the named tracked paths and leaves the rest
 // of the tree alone. A new path has no change to drop, so it is never touched.
 func discardPaths(paths []string) int {
 	var known, fresh []string
 	for _, p := range paths {
-		if tracked(p) {
+		if inHead(p) {
 			known = append(known, p)
 			continue
 		}

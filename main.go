@@ -220,6 +220,11 @@ func resolveAny(arg string) (string, int) {
 	if a == "zz" {
 		return a, 0
 	}
+	if fileID, hunkID, ok := strings.Cut(a, ":"); ok && hunkID != "" {
+		if path, found := fileIndex().Resolve(fileID); found {
+			return "hunk:" + path + ":" + hunkID, 0
+		}
+	}
 	if paths := fileIndex().Ambiguous(a); len(paths) > 0 {
 		ui.Errf("gg discard: %s names %d paths: %s", a, len(paths), strings.Join(paths, " "))
 		ui.Errf("gg discard: write the kind and the full path, or one path changeId")

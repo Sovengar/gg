@@ -872,6 +872,41 @@ if command -v wt >/dev/null 2>&1; then
 	"$BIN" wt rm side --force >/dev/null 2>&1
 fi
 
+echo "three-character changeIds and hunk handles"
+R=$(mktemp -d)
+(cd "$R" && git init -q -b main . && git commit -q --allow-empty -m init)
+cd "$R" || exit 1
+seq 1 30 | sed 's/^/line/' > h.txt
+git add h.txt >/dev/null 2>&1
+git commit -q -m base
+sed -i 's/^line5$/X5/' h.txt
+sed -i 's/^line25$/X25/' h.txt
+fid=$("$BIN" st | grep ' h.txt$' | awk '{print $2}')
+assert_eq "a dirty file changeId is three characters" "${#fid}" "3"
+if command -v script >/dev/null 2>&1; then
+	handles=$(script -qec "$BIN diff" /dev/null 2>/dev/null \
+		| sed -e 's/\x1b\[[0-9;]*m//g' | grep -oE '^[a-z0-9]{3}:[a-z0-9]{2,3}' | head -2)
+	assert_eq "the diff names one handle per hunk" "$(printf '%s\n' "$handles" | wc -l | tr -d ' ')" "2"
+	first=$(printf '%s\n' "$handles" | sed -n 1p)
+	assert_eq "a hunk handle starts with the file changeId" "${first%%:*}" "$fid"
+	"$BIN" discard "$first" >/dev/null 2>&1
+	assert_eq "discard drops one hunk only" "$(git diff --numstat | awk '{print $1}')" "1"
+fi
+assert_contains "a stale hunk handle changes nothing" "$("$BIN" discard "$fid:zz" 2>&1)" "no hunk"
+
+echo "a staged new file is not a discard"
+R=$(newrepo)
+cd "$R" || exit 1
+echo keep > staged.txt
+git add staged.txt >/dev/null 2>&1
+"$BIN" discard staged.txt >/dev/null 2>&1
+assert_eq "discard keeps a staged new file" "$(cat staged.txt)" "keep"
+assert_eq "discard leaves it staged" "$(git status --porcelain)" "A  staged.txt"
+"$BIN" clear </dev/null >/dev/null 2>&1
+assert_contains "clear refuses to delete it silently" "$(git status --porcelain)" "staged.txt"
+"$BIN" clear -f >/dev/null 2>&1
+assert_eq "clear -f removes it" "$(git status --porcelain)" ""
+
 echo "commit and discard by changeId"
 R=$(newrepo)
 cd "$R" || exit 1

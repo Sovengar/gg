@@ -26,8 +26,8 @@ func TestRawIsStable(t *testing.T) {
 }
 
 func TestShaped(t *testing.T) {
-	good := []string{"ab", "abc", "abcd"}
-	bad := []string{"a", "abcde", "AB", "a-b", "@@", "a1"}
+	good := []string{"k", "kl", "klm", "zzzz"}
+	bad := []string{"", "a", "AB", "a-b", "@@", "k1", strings.Repeat("k", MaxLen+1)}
 	for _, g := range good {
 		if !Shaped(g) {
 			t.Errorf("%q should be shaped like a changeId", g)

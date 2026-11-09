@@ -24,7 +24,7 @@ func TestShortestChangeIDIsUnique(t *testing.T) {
 
 func TestBranchChangeIDIsStable(t *testing.T) {
 	raw := RawChangeID("branch:topic")
-	if shortestChangeID(prefixOwners(map[string]string{"topic": raw}), raw) != raw[:MinLen] {
+	if shortestChangeID(prefixOwners(map[string]string{"topic": raw}), raw) != raw[:MintLen()] {
 		t.Fatal("a lone branch should take the shortest changeId")
 	}
 	if RawChangeID("branch:a") == RawChangeID("branch:b") {
