@@ -728,14 +728,18 @@ func wrapItems(items []string, width int) []string {
 	return append(lines, line)
 }
 
-// termWidth reads COLUMNS, falling back to the usual 80 columns.
+// termWidth reads COLUMNS, then the real terminal width, falling back to 100
+// columns so the tables stay wide when neither is known.
 func termWidth() int {
 	if raw := os.Getenv("COLUMNS"); raw != "" {
 		if n, err := strconv.Atoi(raw); err == nil && n > 0 {
 			return n
 		}
 	}
-	return 80
+	if n := ttyWidth(); n > 0 {
+		return n
+	}
+	return 100
 }
 
 // showIDs prints the commit behind one or more changeIDs.
