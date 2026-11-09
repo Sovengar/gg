@@ -13,7 +13,7 @@ import (
 // branch that is not strictly ahead of the target cannot land, because a real
 // merge there would land without the review and the CI a pull request runs.
 func Land(args []string) int {
-	branch, target, yes, err := landArgs(args)
+	branch, target, yes, stack, err := landArgs(args)
 	if err != nil {
 		ui.Errf("gg land: %v", err)
 		return 2
@@ -47,6 +47,18 @@ func Land(args []string) int {
 	if !branchExists(branch) {
 		ui.Errf("gg land: no branch named %s", branch)
 		return 2
+	}
+	if stack {
+		top, chain, err := stackTop(branch)
+		if err != nil {
+			ui.Errf("gg land: %v", err)
+			return 1
+		}
+		if top != branch {
+			ui.Errf("gg land: stack %s; landing %s publishes all of it",
+				strings.Join(chain, " <- "), top)
+			branch = top
+		}
 	}
 	if rc := gitx.Run("fetch", "--quiet", "--prune", "origin"); rc != 0 {
 		return rc
@@ -147,36 +159,71 @@ func unlandedChildren(kids []string, remoteRef string) []string {
 	return out
 }
 
-// landArgs reads the branch, the target and the accept flag. A branch is
-// optional, HEAD's branch when missing; the target falls back to the
-// repository's default branch.
-func landArgs(args []string) (branch, target string, yes bool, err error) {
+// stackTop walks the single-child chain up from branch and names its tip.
+// Landing that tip publishes every branch under it in one push, because a
+// child's history already contains its parent. A fork has no single tip, so
+// each line must land on its own.
+func stackTop(branch string) (top string, chain []string, err error) {
+	rows := branchRows()
+	if len(rows) == 0 {
+		return "", nil, fmt.Errorf("no branches to stack")
+	}
+	nodes := stackNodes(rows, ConventionBranch())
+	kids := make(map[string][]string, len(rows))
+	for _, r := range rows {
+		if p := nodes[r.name].parent; p != "" {
+			kids[p] = append(kids[p], r.name)
+		}
+	}
+	top, chain = branch, []string{branch}
+	for {
+		next := kids[top]
+		switch len(next) {
+		case 0:
+			return top, chain, nil
+		case 1:
+			top = next[0]
+			chain = append(chain, top)
+		default:
+			return "", nil, fmt.Errorf("%s forks into %s; land each top branch on its own",
+				top, strings.Join(next, ", "))
+		}
+	}
+}
+
+// landArgs reads the branch, the target, the accept flag and the stack flag.
+// A branch is optional, HEAD's branch when missing; the target falls back to
+// the repository's default branch.
+func landArgs(args []string) (branch, target string, yes, stack bool, err error) {
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		switch a {
 		case "-y", "--yes":
 			yes = true
 			continue
+		case "-s", "--stack":
+			stack = true
+			continue
 		case "-b", "--onto", "--base":
 			if i+1 >= len(args) {
-				return "", "", false, fmt.Errorf("%s needs a target branch", a)
+				return "", "", false, false, fmt.Errorf("%s needs a target branch", a)
 			}
 			if target != "" {
-				return "", "", false, fmt.Errorf("name one target branch")
+				return "", "", false, false, fmt.Errorf("name one target branch")
 			}
 			target = args[i+1]
 			i++
 			continue
 		}
 		if strings.HasPrefix(a, "-") {
-			return "", "", false, fmt.Errorf("unknown flag %s", a)
+			return "", "", false, false, fmt.Errorf("unknown flag %s", a)
 		}
 		if branch != "" {
-			return "", "", false, fmt.Errorf("name one branch to land")
+			return "", "", false, false, fmt.Errorf("name one branch to land")
 		}
 		branch = a
 	}
-	return branch, target, yes, nil
+	return branch, target, yes, stack, nil
 }
 
 // landConfirm prints the price of landing before it asks: no pull request, so

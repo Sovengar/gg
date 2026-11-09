@@ -74,6 +74,7 @@ gg pr review 42    mount that PR in its own worktree, commits intact (alias: rpr
 gg pr review 42 edit  the same, with the PR diff live in the tree (alias: epr)
 gg land <branch>   fast-forward the target onto it and push: no PR, no CI
 gg land -b rel     land on that target instead; -y skips the confirmation
+gg land --stack    land the whole chain above the branch in one push (alias: -s)
 gg fetch           plain git fetch: fetch.all and fetch.prune decide the scope
 gg update / gg up  fetch --prune --all + pull --rebase --autostash
 gg push / gg p     push; force a rewrite of your own commits only

@@ -1201,8 +1201,12 @@ rc=$?
 assert_eq "land refuses a stacked base" "$rc" "1"
 assert_contains "land names the child on top" "$out" "stacked branches on top: child"
 assert_eq "the refused stacked land pushed nothing" "$(git --git-dir="$BARE" rev-parse main)" "$(git rev-parse origin/main)"
-out=$("$BIN" land child -y 2>&1)
-assert_contains "the child lands" "$out" "landed child onto origin/main"
+out=$("$BIN" land --stack base -y 2>&1)
+rc=$?
+assert_eq "land --stack lands the chain" "$rc" "0"
+assert_contains "land --stack names the chain" "$out" "base <- child"
+assert_contains "land --stack lands the tip" "$out" "landed child onto origin/main"
+assert_eq "land --stack published the tip" "$(git --git-dir="$BARE" rev-parse main)" "$(git rev-parse child)"
 out=$("$BIN" land base -y 2>&1)
 assert_contains "the base landed with the child" "$out" "already landed"
 
