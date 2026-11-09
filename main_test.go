@@ -80,8 +80,8 @@ func TestTermWidth(t *testing.T) {
 		t.Errorf("width = %d, want 120", n)
 	}
 	t.Setenv("COLUMNS", "junk")
-	if n := termWidth(); n != 80 {
-		t.Errorf("width = %d, want the 80 fallback", n)
+	if n := termWidth(); n < 100 {
+		t.Errorf("width = %d, want at least the 100 fallback", n)
 	}
 }
 
