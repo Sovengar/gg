@@ -20,7 +20,7 @@ func Branches(args []string) int {
 	}
 	if strings.HasPrefix(args[0], "-") {
 		if args[0] == "-d" || args[0] == "-D" || args[0] == "--delete" {
-			ui.Errf("gg branch %s is gone. Use gg reap <branch>, with -D to drop unmerged commits.", args[0])
+			ui.Errf("gg branch %s is gone. Use gg discard <branch>, with -f to drop unmerged commits.", args[0])
 			return 2
 		}
 		if createFlag(args[0]) {
