@@ -157,11 +157,11 @@ if [ -f untracked.txt ]; then ok "discard keeps the new file"; else no "discard 
 "$BIN" undo >/dev/null 2>&1
 assert_contains "undo restores the discarded tracked file" "$(cat tracked.txt)" "edit"
 
-"$BIN" clear -f >/dev/null 2>&1
-assert_eq "clear restored the tracked file" "$(cat tracked.txt)" "keep"
-if [ -f untracked.txt ]; then no "clear deletes the new file"; else ok "clear deletes the new file"; fi
+"$BIN" discard zz -f >/dev/null 2>&1
+assert_eq "discard zz restored the tracked file" "$(cat tracked.txt)" "keep"
+if [ -f untracked.txt ]; then no "discard zz deletes the new file"; else ok "discard zz deletes the new file"; fi
 "$BIN" undo >/dev/null 2>&1
-assert_contains "undo restores the cleared tracked file" "$(cat tracked.txt)" "edit"
+assert_contains "undo restores the dropped tracked file" "$(cat tracked.txt)" "edit"
 if [ -f untracked.txt ]; then ok "undo restores the deleted new file"; else no "undo restores the deleted new file"; fi
 
 R=$(newrepo)
@@ -296,7 +296,7 @@ cd "$R" || exit 1
 echo hi > f.txt
 changeId=$("$BIN" log 1 | awk '{print $2}')
 case "$changeId" in
-??|???|????) ok "log shows a bare changeId" ;;
+?|??|???|????) ok "log shows a bare changeId" ;;
 *) no "log shows a bare changeId (got: $changeId)" ;;
 esac
 assert_contains "changeId resolves the changeId" "$("$BIN" changeId "$changeId")" "$changeId"
@@ -530,9 +530,9 @@ assert_contains "help lists wt" "$out" "wt"
 assert_contains "h -v describes new" "$("$BIN" h -v)" "absorb more until you commit"
 assert_contains "h -v describes wt" "$("$BIN" h -v)" "parallel branches, one worktree each"
 assert_contains "help lists discard" "$out" "discard"
-assert_contains "help lists the clear shorthand" "$out" "clear cl"
+assert_contains "help lists the del shorthand" "$out" "discard d, del"
 assert_contains "help lists the revert shorthand" "$out" "revert rv"
-assert_contains "help lists clear" "$out" "clear"
+assert_contains "the discard hint mentions zz" "$("$BIN" hh -v)" "zz deletes new files"
 assert_lacks "help has no cl verb" "$out" "wipe tree and index"
 assert_lacks "help has no cl-wd verb" "$out" "wipe the working tree"
 
@@ -882,10 +882,10 @@ git commit -q -m base
 sed -i 's/^line5$/X5/' h.txt
 sed -i 's/^line25$/X25/' h.txt
 fid=$("$BIN" st | grep ' h.txt$' | awk '{print $2}')
-assert_eq "a dirty file changeId is three characters" "${#fid}" "3"
+case "${#fid}" in 1|2|3|4) ok "a dirty file changeId is short" ;; *) no "a dirty file changeId is short (got ${#fid})" ;; esac
 if command -v script >/dev/null 2>&1; then
 	handles=$(script -qec "$BIN diff" /dev/null 2>/dev/null \
-		| sed -e 's/\x1b\[[0-9;]*m//g' | grep -oE '^[a-z0-9]{3}:[a-z0-9]{2,3}' | head -2)
+		| sed -e 's/\x1b\[[0-9;]*m//g' | grep -oE '^[k-z]+:[0-9a-f]{1,8}' | head -2)
 	assert_eq "the diff names one handle per hunk" "$(printf '%s\n' "$handles" | wc -l | tr -d ' ')" "2"
 	first=$(printf '%s\n' "$handles" | sed -n 1p)
 	assert_eq "a hunk handle starts with the file changeId" "${first%%:*}" "$fid"
@@ -902,10 +902,10 @@ git add staged.txt >/dev/null 2>&1
 "$BIN" discard staged.txt >/dev/null 2>&1
 assert_eq "discard keeps a staged new file" "$(cat staged.txt)" "keep"
 assert_eq "discard leaves it staged" "$(git status --porcelain)" "A  staged.txt"
-"$BIN" clear </dev/null >/dev/null 2>&1
-assert_contains "clear refuses to delete it silently" "$(git status --porcelain)" "staged.txt"
-"$BIN" clear -f >/dev/null 2>&1
-assert_eq "clear -f removes it" "$(git status --porcelain)" ""
+"$BIN" discard zz </dev/null >/dev/null 2>&1
+assert_contains "zz refuses to delete it silently" "$(git status --porcelain)" "staged.txt"
+"$BIN" discard zz -f >/dev/null 2>&1
+assert_eq "zz -f removes it" "$(git status --porcelain)" ""
 
 echo "commit and discard by changeId"
 R=$(newrepo)
@@ -930,8 +930,8 @@ assert_eq "discard reverts a path" "$(git status --porcelain)" ""
 echo fresh > d.txt
 "$BIN" discard d.txt >/dev/null 2>&1
 if [ -f d.txt ]; then ok "discard refuses a new file"; else no "discard refuses a new file"; fi
-"$BIN" clear -f >/dev/null 2>&1
-if [ -f d.txt ]; then no "clear deletes a new file"; else ok "clear deletes a new file"; fi
+"$BIN" discard zz -f >/dev/null 2>&1
+if [ -f d.txt ]; then no "zz deletes a new file"; else ok "zz deletes a new file"; fi
 
 echo "revert keeps the original commit"
 R=$(newrepo)
@@ -958,8 +958,8 @@ echo x >> a.txt
 if "$BIN" revert HEAD >/dev/null 2>&1; then no "revert refuses a wip"; else ok "revert refuses a wip"; fi
 
 out=$("$BIN" help)
-assert_contains "help lists clear" "$out" "clear"
 assert_contains "help lists revert" "$out" "revert"
+assert_lacks "help has no clear" "$out" "clear"
 
 echo "old surface is gone"
 out=$("$BIN" help)
@@ -975,7 +975,8 @@ if "$BIN" us >/dev/null 2>&1; then no "us fails"; else ok "us fails"; fi
 assert_contains "cl-wd names discard" "$("$BIN" cl-wd 2>&1)" "gg discard"
 if "$BIN" discard -a >/dev/null 2>&1; then no "discard -a fails"; else ok "discard -a fails"; fi
 assert_contains "discard -a explains" "$("$BIN" discard -a 2>&1)" "no -a"
-if "$BIN" clear -a >/dev/null 2>&1; then no "clear -a fails"; else ok "clear -a fails"; fi
+if "$BIN" clear >/dev/null 2>&1; then no "clear fails"; else ok "clear fails"; fi
+assert_contains "clear names zz" "$("$BIN" clear 2>&1)" "discard zz"
 
 echo "copy a commit onto a branch"
 R=$(newrepo)
@@ -1043,9 +1044,11 @@ typed_id=$("$BIN" st | grep ' typed.txt$' | awk '{print $2}')
 assert_eq "a typed path prefix drops the edit" "$(git status --porcelain)" ""
 echo again >> typed.txt
 echo new > fresh.txt
-"$BIN" discard zz >/dev/null 2>&1
-assert_eq "zz drops every edit" "$(git status --porcelain)" "?? fresh.txt"
-assert_eq "zz keeps the new file" "$(cat fresh.txt)" "new"
+"$BIN" discard zz </dev/null >/dev/null 2>&1
+assert_eq "zz asks before deleting a new file" "$(git status --porcelain)" " M typed.txt
+?? fresh.txt"
+"$BIN" discard zz -f >/dev/null 2>&1
+assert_eq "zz -f drops every edit and the new file" "$(git status --porcelain)" ""
 assert_contains "del is the long abbreviation" "$("$BIN" help)" "discard d, del"
 R=$(mktemp -d)
 (cd "$R" && git init -q -b main . && git commit -q --allow-empty -m init)

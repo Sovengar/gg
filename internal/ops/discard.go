@@ -54,7 +54,7 @@ func Discard(args []string) int {
 		kind, name := discardKind(item)
 		switch kind {
 		case "all":
-			if code := gitx.Run("reset", "--hard", "--quiet"); code != 0 {
+			if code := discardAll(force); code != 0 {
 				rc = code
 			}
 		case "commit":
@@ -160,6 +160,37 @@ func discardHunk(spec string) int {
 	}
 	ui.Errf("gg discard: dropped hunk %s of %s", id, path)
 	return 0
+}
+
+// discardAll is zz: every edit goes and every new path is deleted, because no
+// commit holds one. It asks before deleting, and -f skips the question.
+func discardAll(force bool) int {
+	fresh := untracked()
+	if len(fresh) > 0 && !force && !confirmAll(fresh) {
+		return 1
+	}
+	if rc := gitx.Run("reset", "--hard", "--quiet"); rc != 0 {
+		return rc
+	}
+	return gitx.Run("clean", "-f", "-d")
+}
+
+// confirmAll asks before deleting new paths, which no commit holds.
+func confirmAll(paths []string) bool {
+	ui.Errf("gg discard zz: %d new path(s) would be deleted, and git cannot restore them:", len(paths))
+	for _, p := range paths {
+		ui.Errf("    %s", p)
+	}
+	choice, ok := ui.Prompt("gg discard zz: delete them? [y/N] > ")
+	if !ok {
+		ui.Errf("gg discard zz: nothing deleted. Pass -f to drop new paths.")
+		return false
+	}
+	if choice != "y" && choice != "yes" {
+		ui.Errf("gg discard zz: nothing deleted")
+		return false
+	}
+	return true
 }
 
 // discardPaths drops the edits of the named tracked paths and leaves the rest

@@ -177,6 +177,14 @@ func resolveArgs(name string, args []string) ([]string, int) {
 			out[i] = a
 			continue
 		}
+		// a path verb reads a file id first: with one-character ids a file and a
+		// commit can share a token, and only the verb knows which one it wants
+		if pathVerb(name) {
+			if path, ok := fileIndex().Resolve(strings.TrimPrefix(a, "@")); ok {
+				out[i] = path
+				continue
+			}
+		}
 		ref, status := changeIndex().Resolve(a)
 		switch status {
 		case ids.Resolved:
@@ -188,12 +196,6 @@ func resolveArgs(name string, args []string) ([]string, int) {
 		case ids.Ambiguous:
 			return out, 2
 		default:
-			if pathVerb(name) {
-				if path, ok := fileIndex().Resolve(a); ok {
-					out[i] = path
-					continue
-				}
-			}
 			out[i] = a
 		}
 	}
@@ -347,9 +349,11 @@ var removed = map[string]string{
 	"Dbr":     "Use gg discard <branch> --force, which drops unmerged commits and the worktree.",
 	"reap":    "Use gg discard <branch>, or gg discard zz for every uncommitted change.",
 	"abandon": "Use gg discard <commit>.",
-	"cl-wd":   "Use gg discard to drop edits, and gg clear to delete new files.",
-	"cl-sa":   "It took the index. Use gg discard or gg clear.",
-	"us":      "It took the index. Use gg discard or gg clear.",
+	"clear":   "Use gg discard zz, which drops every edit and deletes the new files.",
+	"cl":      "Use gg discard zz, which drops every edit and deletes the new files.",
+	"cl-wd":   "Use gg discard to drop edits, and gg discard zz to delete new files.",
+	"cl-sa":   "It took the index. Use gg discard or gg discard zz.",
+	"us":      "It took the index. Use gg discard or gg discard zz.",
 	"raw":     "An unknown verb still reaches git: gg <verb>. The call is no longer recorded for undo.",
 }
 

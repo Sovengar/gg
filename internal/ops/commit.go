@@ -195,33 +195,6 @@ func inHead(path string) bool {
 	return err == nil
 }
 
-// Clear drops every edit and deletes the new files, so the tree matches HEAD.
-// No commit holds a new file, so git cannot bring one back: it asks first,
-// and -f skips the question.
-func Clear(args []string) int {
-	force := false
-	for _, a := range args {
-		switch a {
-		case "-f", "--force":
-			force = true
-		case "-a", "--all":
-			ui.Errf("gg clear: no -a. It already means everything.")
-			return 2
-		default:
-			ui.Errf("gg clear: it takes no path and no changeId, only -f to skip the prompt")
-			return 2
-		}
-	}
-	fresh := untracked()
-	if len(fresh) > 0 && !force && !confirmClear(fresh) {
-		return 1
-	}
-	if rc := gitx.Run("reset", "--hard", "--quiet"); rc != 0 {
-		return rc
-	}
-	return gitx.Run("clean", "-f", "-d")
-}
-
 // untracked lists every new path git would delete: the files it never saw and
 // the ones staged as additions, which a reset --hard removes without a word.
 func untracked() []string {
@@ -244,18 +217,4 @@ func untracked() []string {
 		}
 	}
 	return out
-}
-
-// confirmClear asks before deleting new paths, which no commit holds.
-func confirmClear(paths []string) bool {
-	ui.Errf("gg clear: %d new path(s) would be deleted, and git cannot restore them:", len(paths))
-	for _, p := range paths {
-		ui.Errf("    %s", p)
-	}
-	choice, ok := ui.Prompt("gg clear: delete them? [y/N] > ")
-	if !ok {
-		ui.Errf("gg clear: nothing deleted. Pass -f to drop new paths.")
-		return false
-	}
-	return choice == "y" || choice == "yes"
 }

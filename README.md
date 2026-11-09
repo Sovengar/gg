@@ -52,7 +52,7 @@ gg c -m "msg" kd qz  commit only those changeIds
 gg ce -m "msg" kd    commit every dirty path except kd (commit -e; alias: ce)
 gg discard kd      drop that change, keep the rest; undoable with gg undo
 gg discard         drop every edit, keep the new files
-gg clear           drop every edit and delete the new files (-f skips the question)
+gg discard zz      every edit goes and the new files are deleted (-f skips the question)
 gg new             save the changes, then absorb more until you commit
 gg amend           fold changes into HEAD
 gg amend <id>      fold changes into another commit (git history fixup)
@@ -136,7 +136,7 @@ takes changeIds and the index stays git's business:
 gg dash            kd M docs/README.md, px ?? notes.md
 gg c -m "docs" kd  commit one path, leave px dirty
 gg discard kdm     drop a change, keep the rest
-gg clear           drop every edit, then delete the new files
+gg discard zz      every edit, then the new files
 gg new             or park everything in a wip commit on the branch
 ```
 
@@ -151,9 +151,9 @@ gg discard kdm:6a  drop that hunk, keep the other one
 
 `gg discard` drops edits and keeps the new files: a new file is not a change
 to drop. It also takes a commit changeId or a branch changeId; see "One discard,
-three kinds". `gg clear` drops the edits and deletes the new files, since no commit
-holds them and git cannot bring one back; without `-f` it asks first, and
-refuses when nobody can answer.
+three kinds". `gg discard zz` drops the edits and deletes the new files, since no
+commit holds them; without `-f` it asks first, and refuses when nobody can
+answer. `gg undo` still brings them back from the oplog snapshot.
 
 ### Work in progress and worktrees
 
@@ -238,7 +238,7 @@ token that names two kinds fails with the candidates instead of guessing.
 gg discard kd          the edit of that path, the rest of the tree stays
 gg discard <commit>    the commit, its children replayed on its parent
 gg discard side        the branch and the worktree that holds it
-gg discard zz          every uncommitted edit, keeping new files
+gg discard zz          every uncommitted edit, and the new files too
 ```
 
 The price of each kind is asked for with the same flags: `-f` drops unmerged
@@ -249,8 +249,10 @@ when its question is answered: `gg undo` restores refs, not another directory.
 
 ### ChangeIds
 
-Every file, commit and branch in gg carries a changeId: three characters that
-name it, growing to four when two of them share all three.
+Every file, commit and branch in gg carries a changeId in reverse hex, the
+scheme but, jj and Gerrit share: the letters k to z, where z is zero. An id is
+the shortest unique prefix of that string, minted at one character for a human
+and four when an agent runs the command.
 
 - A commit takes its changeId from the `Change-Id` trailer, so an amend, a
   rebase or a squash keeps the same changeId while the sha changes. A commit
@@ -259,7 +261,9 @@ name it, growing to four when two of them share all three.
   commit never share it.
 - A dirty path takes its changeId from the path.
 
-A changeId is the shortest unique prefix, never shorter than three characters:
+A changeId names one thing inside its own kind, so a file id and a commit id may
+coincide; the verb decides which one it reads, and `gg discard` names both
+candidates instead of guessing. In practice:
 
 ```
 * @nan 641682b (2 minutes ago) chore: dev env  (HEAD -> trunk) [Playground]
@@ -413,7 +417,7 @@ merge, since a merge cannot fold into a single parent.
   `refs/remotes` is never touched. `gg oplog` lists them newest first, `gg undo` restores
   the state before the last operation, `gg undo N` goes back N entries, and `gg redo`
   moves forward again when the last action was an undo. This also makes `gg discard`,
-  `gg clear` and branch or tag changes revertible. The newest 100 entries are kept.
+  `gg discard zz` and branch or tag changes revertible. The newest 100 entries are kept.
 - Every mutating verb ends with a footer: `@ <sha> · ahead N · behind M`.
 - `gg push` force-pushes on its own only when the force would drop nothing but your
   own commits, and no other remote branch holds them; the lease and
