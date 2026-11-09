@@ -28,9 +28,18 @@ func RunBin(bin string, args ...string) int {
 	return exitCode(cmd.Run())
 }
 
+// quoted runs git with path quoting off, so a non-ASCII path comes back as the
+// bytes git holds, not as a "caf\303\251" escape. Every reader below goes
+// through it, since every one of them may print or match a path.
+func quoted(args []string) []string {
+	out := make([]string, 0, len(args)+2)
+	out = append(out, "-c", "core.quotePath=false")
+	return append(out, args...)
+}
+
 // Output runs git and returns trimmed stdout.
 func Output(args ...string) (string, error) {
-	cmd := exec.Command("git", args...)
+	cmd := exec.Command("git", quoted(args)...)
 	cmd.Stderr = nil
 	out, err := cmd.Output()
 	if err != nil {
@@ -68,6 +77,16 @@ func exitCode(err error) int {
 		return ee.ExitCode()
 	}
 	return 1
+}
+
+// Prefix returns the path from the work tree root to the current directory,
+// with a trailing slash, or "" at the root.
+func Prefix() string {
+	out, err := Output("rev-parse", "--show-prefix")
+	if err != nil {
+		return ""
+	}
+	return out
 }
 
 // InRepo reports whether the current directory is inside a work tree.
