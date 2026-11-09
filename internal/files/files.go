@@ -15,13 +15,14 @@ import (
 // Index maps changeIDs to paths for the current working tree.
 type Index struct {
 	changeIDs map[string]string   // path -> changeId
+	raws      map[string]string   // path -> full reverse-hex identity
 	byToken   map[string]string   // unique token -> path
 	ambig     map[string][]string // token shared by several paths
 }
 
 // Load reads the dirty paths once.
 func Load() *Index {
-	ix := &Index{changeIDs: map[string]string{}, byToken: map[string]string{}, ambig: map[string][]string{}}
+	ix := &Index{changeIDs: map[string]string{}, raws: map[string]string{}, byToken: map[string]string{}, ambig: map[string][]string{}}
 
 	lines, err := gitx.OutputAll("status", "--short", "--untracked-files=all")
 	if err != nil {
@@ -40,6 +41,7 @@ func Load() *Index {
 	owners := map[string][]string{}
 	for _, p := range paths {
 		raw := fileRaw(p)
+		ix.raws[p] = raw
 		ix.changeIDs[p] = raw
 		for n := ids.MintLen(); n <= ids.MaxLen && n <= len(raw); n++ {
 			owners[raw[:n]] = append(owners[raw[:n]], p)
@@ -72,6 +74,9 @@ func fileRaw(path string) string {
 	}
 	return path + raw
 }
+
+// Raws is the full identity of every dirty path in the index.
+func (ix *Index) Raws() map[string]string { return ix.raws }
 
 // ChangeID returns the changeId for a path, or "" when the path is clean.
 func (ix *Index) ChangeID(path string) string { return ix.changeIDs[path] }

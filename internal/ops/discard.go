@@ -145,7 +145,7 @@ func discardHunk(spec string) int {
 	path, id := spec[:i], spec[i+1:]
 	var found *files.Hunk
 	for _, h := range files.HunksOf(path, 3) {
-		if h.ID == id {
+		if h.ID == id || (h.ID != "" && strings.HasPrefix(h.Full, id)) {
 			found = &h
 			break
 		}

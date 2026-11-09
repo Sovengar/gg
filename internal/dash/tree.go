@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"strings"
 
-	"gg/internal/files"
 	"gg/internal/gitx"
 	"gg/internal/hist"
+	"gg/internal/idmap"
 	"gg/internal/ids"
 	"gg/internal/ops"
 	"gg/internal/ui"
@@ -94,7 +94,7 @@ func tree(args []string, opt view) int {
 	lanes, base := lanesOf(sha, n, opt)
 	notes := wtNotes()
 
-	fileLane(files.Load())
+	fileLane()
 	fmt.Println(ui.Dim("┊"))
 
 	// lanes are drawn stack by stack, the way but does it: one box per stack,
@@ -119,7 +119,7 @@ func tree(args []string, opt view) int {
 			if i == 0 {
 				head = "┊╭┄"
 			}
-			header := ui.Dim(head) + " " + ui.Red(branchHandle(l.name)) + " " + ui.Dim("["+l.name+"]")
+			header := ui.Dim(head) + " " + branchHandle(l.name) + " " + ui.Dim("["+l.name+"]")
 			if note := notes[l.name]; note != "" {
 				header += " " + note
 			}
@@ -160,8 +160,8 @@ func tree(args []string, opt view) int {
 
 // fileLane prints the uncommitted section: one row per dirty path, every path
 // carrying the changeId its verb takes.
-func fileLane(fidx *files.Index) {
-	rows := fileRows(fidx)
+func fileLane() {
+	rows := fileRows()
 	head := ui.Dim("╭┄") + " " + ui.Red(uncommittedHandle()) + " " + ui.Dim("[uncommitted]")
 	if gitx.InWip() {
 		head += " " + ui.Yellow("wip")
@@ -191,14 +191,14 @@ func emptyNote(n int, scoped bool) string {
 // subdirectory git names the paths outside it with ../, and those rows are
 // left out: the changeIds still cover the whole tree, so a verb can still take
 // one the lane does not draw.
-func fileRows(fidx *files.Index) []string {
+func fileRows() []string {
 	lines, err := gitx.OutputAll("status", "--short", "--untracked-files=all")
 	if err != nil {
 		return nil
 	}
 	scoped := gitx.Prefix() != ""
 
-	type row struct{ handle, status, path string }
+	type row struct{ plain, painted, status, path string }
 	var rows []row
 	width := ids.MinLen
 	for _, l := range lines {
@@ -209,16 +209,17 @@ func fileRows(fidx *files.Index) []string {
 		if scoped && strings.HasPrefix(path, "../") {
 			continue
 		}
-		handle := fidx.ChangeID(path)
-		if len(handle) > width {
-			width = len(handle)
+		plain := idmap.Shared().FilePlain(path)
+		if len(plain) > width {
+			width = len(plain)
 		}
-		rows = append(rows, row{handle, fileStatus(l[:2]), path})
+		rows = append(rows, row{plain, idmap.Shared().FileDisplay(path), fileStatus(l[:2]), path})
 	}
 
 	out := make([]string, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, ui.Red(fmt.Sprintf("%-*s", width, r.handle))+" "+statusLetter(r.status)+" "+r.path)
+		pad := width - len(r.plain)
+		out = append(out, r.painted+strings.Repeat(" ", pad)+" "+statusLetter(r.status)+" "+r.path)
 	}
 	return out
 }
@@ -445,13 +446,7 @@ func localBranches() []branch {
 	return out
 }
 
-func branchHandle(name string) string {
-	ix, err := ids.LoadBranches()
-	if err != nil {
-		return ids.RawChangeID("branch:" + name)[:ids.MinLen]
-	}
-	return ix.ChangeID(name)
-}
+func branchHandle(name string) string { return idmap.Shared().BranchDisplay(name) }
 
 // uncommittedHandle is the fixed changeId of the uncommitted lane, the same
 // "zz" every but workspace prints.

@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"gg/internal/gitx"
-	"gg/internal/ids"
 	"gg/internal/ui"
 )
 
@@ -36,7 +35,7 @@ func Stack() int {
 	roots, kids := stackTree(rows, nodes)
 
 	roots = defaultFirst(roots, def)
-	bidx := branchIndexOrEmpty()
+	bidx := branchShort()
 	width := stackWidth(roots, kids, nodes)
 
 	fmt.Println(ui.Dim(fmt.Sprintf("  branch stacks (%d):", len(rows))))
@@ -194,7 +193,7 @@ func stackWidth(roots []string, kids map[string][]string, nodes map[string]*stac
 
 // stackLine renders one branch: its changeId, its name under a branch mark
 // when it has a parent, then how many commits it holds above that parent.
-func stackLine(n *stackNode, guides []bool, width int, bidx *ids.BranchIndex, def string) string {
+func stackLine(n *stackNode, guides []bool, width int, short func(string) string, def string) string {
 	marker := " "
 	if n.row.current {
 		marker = "*"
@@ -218,7 +217,7 @@ func stackLine(n *stackNode, guides []bool, width int, bidx *ids.BranchIndex, de
 	if pad < 0 {
 		pad = 0
 	}
-	line := fmt.Sprintf("  %s %s %s%s%s", ui.Green(marker), ui.Red(bidx.ChangeID(n.row.name)),
+	line := fmt.Sprintf("  %s %s %s%s%s", ui.Green(marker), short(n.row.name),
 		box, n.row.name, strings.Repeat(" ", pad)+"  ")
 	if n.parent == "" {
 		line += ui.Dim("base")

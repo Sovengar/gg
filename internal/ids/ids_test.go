@@ -50,3 +50,22 @@ func TestChangeIDFallsBackToSHA(t *testing.T) {
 		t.Errorf("Short = %q, want the abbreviated sha", ix.Short(sha))
 	}
 }
+
+func TestAssignShortIsOneNamespace(t *testing.T) {
+	raws := map[string]string{
+		"commit:a": "zzzz",
+		"branch:b": "zzzy",
+		"file:c":   "zzzk",
+	}
+	short := AssignShort(raws, map[string]bool{"zz": true})
+	seen := map[string]bool{}
+	for key, token := range short {
+		if token == "zz" {
+			t.Fatalf("%s took a reserved token", key)
+		}
+		if seen[token] {
+			t.Fatalf("%s shares the token %q", key, token)
+		}
+		seen[token] = true
+	}
+}

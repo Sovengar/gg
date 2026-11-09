@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"gg/internal/gitx"
-	"gg/internal/ids"
+	"gg/internal/idmap"
 	"gg/internal/oplog"
 	"gg/internal/ui"
 )
@@ -102,12 +102,12 @@ func branchRows() []branchRow {
 
 // branchLine renders one branch with its changeId, its upstream drift and,
 // when it is the default branch, a mark for it.
-func branchLine(r branchRow, nameWidth int, bidx *ids.BranchIndex, def string) string {
+func branchLine(r branchRow, nameWidth int, short func(string) string, def string) string {
 	marker := " "
 	if r.current {
 		marker = "*"
 	}
-	line := fmt.Sprintf("  %s %s %-*s", ui.Green(marker), ui.Red(bidx.ChangeID(r.name)), nameWidth, r.name)
+	line := fmt.Sprintf("  %s %s %-*s", ui.Green(marker), short(r.name), nameWidth, r.name)
 	if r.upstream == "" {
 		line += "  " + ui.Dim("no upstream")
 	} else {
@@ -128,7 +128,7 @@ func listBranches() int {
 		return 1
 	}
 
-	bidx := branchIndexOrEmpty()
+	bidx := branchShort()
 	nameWidth := widestName(rows)
 	for _, r := range rows {
 		fmt.Println(branchLine(r, nameWidth, bidx, ""))
@@ -158,7 +158,7 @@ func recentBranches(limit int) {
 		}
 	}
 
-	bidx := branchIndexOrEmpty()
+	bidx := branchShort()
 	nameWidth := widestName(shown)
 	fmt.Println(ui.Dim(fmt.Sprintf("  branches (%d newest, default always):", limit)))
 	for _, r := range shown {
@@ -193,7 +193,7 @@ func MergedBranches(args []string) int {
 		ui.Errf("gg br -lm: no branch is merged into %s", target)
 		return 0
 	}
-	bidx := branchIndexOrEmpty()
+	bidx := branchShort()
 	nameWidth := widestName(shown)
 	fmt.Println(ui.Dim("  merged into " + target + ":"))
 	for _, r := range shown {
@@ -202,13 +202,7 @@ func MergedBranches(args []string) int {
 	return 0
 }
 
-func branchIndexOrEmpty() *ids.BranchIndex {
-	bidx, err := ids.LoadBranches()
-	if err != nil {
-		return &ids.BranchIndex{}
-	}
-	return bidx
-}
+func branchShort() func(string) string { return idmap.Shared().BranchDisplay }
 
 func widestName(rows []branchRow) int {
 	width := 0
