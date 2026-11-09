@@ -58,7 +58,7 @@ branch switch	fn:branches	change branch	hint:Takes a branch	display:branch <name
 cbr	switch -c	branch new and switch	hint:Takes a branch. branch new <name> works too	display:branch -c cbr	variant
 dbr	fn:deleteBranch	delete a branch, tip kept in a ref	hint:Safe: unmerged commits stay. Takes a branch or a changeId	display:branch -d dbr	variant
 Dbr	fn:deleteBranchForce	delete a branch even when unmerged	hint:Force. Drops unmerged commits, keeps the tip ref	display:branch -D Dbr	variant
-mg	merge	merge a branch into this one	hint:Takes a branch
+merge|mg	fn:merge	merge a branch into this one	hint:Takes a branch. Fast-forward only; --no-ff keeps a merge commit
 wt	fn:wt	parallel branches, one worktree each	hint:Takes new|ls|rm
 mzt	tool:git-machete	branch layout maintenance
 
