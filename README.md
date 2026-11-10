@@ -68,8 +68,8 @@ gg wt rm side      remove it, --force when dirty
 gg merge <branch>  merge it, fast-forward only; --no-ff keeps a merge commit
 gg conflict/cf     git mergetool: resolve conflicts with the configured tool
 gg absorb          git absorb
-gg pr              open a PR for this branch; a stacked branch bases on its parent
-gg pr -d           the same, as a draft (extra args go to gh verbatim)
+gg pr              open PRs bottom-up for this branch and the stack it stands on
+gg pr -1           the branch alone; -d makes them drafts (extra args go to gh verbatim)
 gg pr review 42    mount that PR in its own worktree, commits intact (alias: rpr)
 gg pr review 42 edit  the same, with the PR diff live in the tree (alias: epr)
 gg land <branch>   fast-forward the target onto it and push: no PR, no CI
@@ -197,7 +197,10 @@ markers disappear and nothing else changes.
 `gg ship` is the composing end of a branch: it turns its commits into one,
 replays it on the local target, fast-forwards the target and removes the
 worktree. It never pushes. `gg land` is the publishing end: it fast-forwards the
-target and pushes, and it keeps the commits. `gg pr` is the review path.
+target and pushes, and it keeps the commits. `gg pr` is the review path: it
+pushes each branch with a lease and opens one pull request per branch,
+bottom-up, each based on the one under it, the way `but pr new <top>` publishes
+a stack. A branch that already has a pull request is left as it is.
 
 ```
 gg ship side       squash side into one commit on the default branch
