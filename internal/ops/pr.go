@@ -24,8 +24,10 @@ var ghOutput = func(args ...string) (string, error) {
 }
 
 // PR opens a pull request for the current branch, or mounts one to review.
-// The base of a stacked branch is its stack parent, exactly the branch that
-// `gg br -a` draws it under, so no metadata is stored.
+// A stacked branch is published with the branches it stands on, bottom-up, the
+// way `but pr new <top>` publishes a stack: each pull request bases on the one
+// under it, exactly the branch that `gg br -a` draws it under, so no metadata
+// is stored. -1 keeps the run to the current branch alone.
 func PRNew(args []string) int {
 	if len(args) > 0 && args[0] == "review" {
 		return PRReview(args[1:])
@@ -33,36 +35,116 @@ func PRNew(args []string) int {
 	if len(args) > 0 && args[0] == "new" {
 		args = args[1:]
 	}
-	draft, rest := prNewArgs(args)
+	draft, single, rest := prNewArgs(args)
 
 	branch, err := gitx.Output("rev-parse", "--abbrev-ref", "HEAD")
 	if err != nil || branch == "" || branch == "HEAD" {
 		ui.Errf("gg pr: detached HEAD, switch to a branch first")
 		return 1
 	}
-	if _, ok := gitx.Upstream(); !ok {
-		ui.Errf("gg pr: %s has no upstream, run gg push first", branch)
-		return 1
+	for _, b := range prChain(branch, single) {
+		if rc := prPublish(b, draft, rest); rc != 0 {
+			return rc
+		}
 	}
-	argv := []string{"pr", "create", "--head", branch, "--base", prBase(branch), "--fill"}
-	if draft {
-		argv = append(argv, "--draft")
-	}
-	argv = append(argv, rest...)
-	return ghRun(argv...)
+	return 0
 }
 
-// prNewArgs splits the draft flag from the arguments gh should see verbatim.
-func prNewArgs(args []string) (draft bool, rest []string) {
+// prPublish pushes one branch and opens its pull request. A branch that
+// already has one is left alone, so a second run after a change only adds the
+// reviews the stack is missing.
+func prPublish(branch string, draft bool, rest []string) int {
+	if rc := prPush(branch); rc != 0 {
+		return rc
+	}
+	base := prBase(branch)
+	if num, ok := prExisting(branch); ok {
+		ui.Errf("gg pr: %s already has #%d, left as it is", branch, num)
+		return 0
+	}
+	ui.Errf("gg pr: %s bases on %s", branch, base)
+	present := []string{"pr", "create", "--head", branch, "--base", base, "--fill"}
+	if draft {
+		present = append(present, "--draft")
+	}
+	return ghRun(append(present, rest...)...)
+}
+
+// prRun pushes one branch. A package var so tests can stub the push.
+var prRun = func(args ...string) int { return gitx.Run(args...) }
+
+// prPush publishes a branch the way the review path needs it: with a lease, so
+// a rewritten branch lands only when the remote is still what this repository
+// saw, and never a commit someone else pushed.
+func prPush(branch string) int {
+	if rc := prRun("push", "--force-with-lease", "-u", "origin", branch); rc != 0 {
+		ui.Errf("gg pr: cannot push %s", branch)
+		return rc
+	}
+	return 0
+}
+
+// prExisting names the pull request a branch already has, if any.
+func prExisting(branch string) (int, bool) {
+	out, err := ghOutput("pr", "view", branch, "--json", "number", "-q", ".number")
+	if err != nil || out == "" {
+		return 0, false
+	}
+	n, convErr := strconv.Atoi(out)
+	if convErr != nil {
+		return 0, false
+	}
+	return n, true
+}
+
+// prChain names the branches to publish, base first: every branch under the
+// current one up to the floor of its stack, then the branch itself. A floor is
+// never published, and -1 keeps the chain to the branch alone.
+func prChain(branch string, single bool) []string {
+	if single {
+		return []string{branch}
+	}
+	rows := branchRows()
+	floor := DefaultBranch()
+	nodes := stackNodes(rows, floor)
+	chain := []string{branch}
+	seen := map[string]bool{branch: true}
+	for p := prParent(nodes, branch); p != "" && !seen[p]; p = prParent(nodes, p) {
+		if p == floor || strings.HasPrefix(p, "gitbutler/") {
+			break
+		}
+		chain = append(chain, p)
+		seen[p] = true
+	}
+	for i, j := 0, len(chain)-1; i < j; i, j = i+1, j-1 {
+		chain[i], chain[j] = chain[j], chain[i]
+	}
+	return chain
+}
+
+// prParent names the branch a branch is stacked on, or "" when it stands on
+// the floor of its stack.
+func prParent(nodes map[string]*stackNode, name string) string {
+	if node, ok := nodes[name]; ok {
+		return node.parent
+	}
+	return ""
+}
+
+// prNewArgs splits the draft flag and the single-branch flag from the
+// arguments gh should see verbatim.
+func prNewArgs(args []string) (draft, single bool, rest []string) {
 	for _, a := range args {
 		switch a {
 		case "-d", "--draft":
 			draft = true
+		case "-1", "--single":
+			single = true
 		default:
 			rest = append(rest, a)
 		}
 	}
-	return draft, rest
+	return draft, single, rest
 }
 
 // prBase names the base of a PR: the stack parent, or the default branch when

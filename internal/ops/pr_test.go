@@ -1,6 +1,7 @@
 package ops
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,20 +11,23 @@ import (
 
 func TestPRNewArgs(t *testing.T) {
 	cases := []struct {
-		args  []string
-		draft bool
-		rest  []string
+		args          []string
+		draft, single bool
+		rest          []string
 	}{
-		{nil, false, nil},
-		{[]string{"-d"}, true, nil},
-		{[]string{"--draft"}, true, nil},
-		{[]string{"--title", "two words", "-d", "--body", "why"}, true, []string{"--title", "two words", "--body", "why"}},
-		{[]string{"--reviewer", "ana", "--label", "bug"}, false, []string{"--reviewer", "ana", "--label", "bug"}},
+		{nil, false, false, nil},
+		{[]string{"-d"}, true, false, nil},
+		{[]string{"--draft"}, true, false, nil},
+		{[]string{"-1"}, false, true, nil},
+		{[]string{"--single", "-d"}, true, true, nil},
+		{[]string{"--title", "two words", "-d", "--body", "why"}, true, false, []string{"--title", "two words", "--body", "why"}},
+		{[]string{"--reviewer", "ana", "--label", "bug"}, false, false, []string{"--reviewer", "ana", "--label", "bug"}},
 	}
 	for _, c := range cases {
-		draft, rest := prNewArgs(c.args)
-		if draft != c.draft || strings.Join(rest, "\x00") != strings.Join(c.rest, "\x00") {
-			t.Errorf("prNewArgs(%q) = %v, %q; want %v, %q", c.args, draft, rest, c.draft, c.rest)
+		draft, single, rest := prNewArgs(c.args)
+		if draft != c.draft || single != c.single || strings.Join(rest, "\x00") != strings.Join(c.rest, "\x00") {
+			t.Errorf("prNewArgs(%q) = %v, %v, %q; want %v, %v, %q",
+				c.args, draft, single, rest, c.draft, c.single, c.rest)
 		}
 	}
 }
@@ -131,78 +135,119 @@ func TestPRBaseSelectsStackParent(t *testing.T) {
 	}
 }
 
-// prUpstreamRepo is a repo on feat/a whose upstream is main.
-func prUpstreamRepo(t *testing.T) string {
+// prStub replaces the push and the gh calls with recorders. ghOutput reports
+// that no pull request exists, unless existing names one.
+func prStub(t *testing.T, existing string) (pushed, created *[]string) {
+	t.Helper()
+	oldRun, oldGH, oldOut := prRun, ghRun, ghOutput
+	t.Cleanup(func() { prRun, ghRun, ghOutput = oldRun, oldGH, oldOut })
+	push, make := &[]string{}, &[]string{}
+	prRun = func(args ...string) int { *push = append(*push, strings.Join(args, " ")); return 0 }
+	ghOutput = func(args ...string) (string, error) {
+		if existing == "" {
+			return "", errors.New("no pull requests found")
+		}
+		return existing, nil
+	}
+	ghRun = func(args ...string) int { *make = append(*make, strings.Join(args, " ")); return 0 }
+	return push, make
+}
+
+// prStackRepo is a repo whose HEAD, feat/b, stands on feat/a, which stands on
+// main. feat/c is a sibling of feat/a, cut from the same main commit.
+func prStackRepo(t *testing.T) string {
 	t.Helper()
 	dir := prRepo(t)
 	prGit(t, dir, "switch", "-q", "-c", "feat/a")
 	prGit(t, dir, "commit", "-q", "--allow-empty", "-m", "a1")
-	prGit(t, dir, "update-ref", "refs/remotes/origin/main", "main")
-	prGit(t, dir, "config", "remote.origin.url", dir)
-	prGit(t, dir, "config", "--add", "remote.origin.fetch", "+refs/heads/*:refs/remotes/origin/*")
-	prGit(t, dir, "config", "branch.feat/a.remote", "origin")
-	prGit(t, dir, "config", "branch.feat/a.merge", "refs/heads/main")
+	prGit(t, dir, "switch", "-q", "-c", "feat/b")
+	prGit(t, dir, "commit", "-q", "--allow-empty", "-m", "b1")
+	prGit(t, dir, "switch", "-q", "main")
+	prGit(t, dir, "switch", "-q", "-c", "feat/c")
+	prGit(t, dir, "commit", "-q", "--allow-empty", "-m", "c1")
+	prGit(t, dir, "switch", "-q", "feat/b")
 	return dir
 }
 
-func TestPRNewCallsGH(t *testing.T) {
-	dir := prUpstreamRepo(t)
-	prInDir(t, dir)
-
-	old := ghRun
-	t.Cleanup(func() { ghRun = old })
-	var got []string
-	ghRun = func(args ...string) int {
-		got = append([]string(nil), args...)
-		return 0
+func TestPRChainNamesTheBaseFirst(t *testing.T) {
+	prInDir(t, prStackRepo(t))
+	cases := []struct {
+		branch string
+		single bool
+		want   string
+	}{
+		{"feat/b", false, "feat/a feat/b"},
+		{"feat/a", false, "feat/a"},
+		{"feat/c", false, "feat/c"},
+		{"feat/b", true, "feat/b"},
 	}
+	for _, c := range cases {
+		got := strings.Join(prChain(c.branch, c.single), " ")
+		if got != c.want {
+			t.Errorf("prChain(%q, %v) = %q, want %q", c.branch, c.single, got, c.want)
+		}
+	}
+}
+
+func TestPRNewPublishesTheStack(t *testing.T) {
+	prInDir(t, prStackRepo(t))
+	pushed, created := prStub(t, "")
 
 	if rc := PRNew(nil); rc != 0 {
 		t.Fatalf("PRNew = %d, want 0", rc)
 	}
-	want := "pr create --head feat/a --base main --fill"
-	if strings.Join(got, " ") != want {
-		t.Errorf("gh %q, want %q", strings.Join(got, " "), want)
+	wantPush := "push --force-with-lease -u origin feat/a push --force-with-lease -u origin feat/b"
+	if got := strings.Join(*pushed, " "); got != wantPush {
+		t.Errorf("pushed %q, want %q", got, wantPush)
 	}
-
-	got = nil
-	if rc := PRNew([]string{"new", "--label", "bug"}); rc != 0 {
-		t.Fatalf("PRNew(new ...) = %d, want 0", rc)
-	}
-	want = "pr create --head feat/a --base main --fill --label bug"
-	if strings.Join(got, " ") != want {
-		t.Errorf("gh %q, want %q", strings.Join(got, " "), want)
-	}
-
-	got = nil
-	if rc := PRNew([]string{"-d", "--title", "two words", "--reviewer", "ana"}); rc != 0 {
-		t.Fatalf("PRNew(-d ...) = %d, want 0", rc)
-	}
-	want = "pr create --head feat/a --base main --fill --draft --title two words --reviewer ana"
-	if strings.Join(got, " ") != want {
-		t.Errorf("gh %q, want %q", strings.Join(got, " "), want)
+	wantCreate := "pr create --head feat/a --base main --fill pr create --head feat/b --base feat/a --fill"
+	if got := strings.Join(*created, " "); got != wantCreate {
+		t.Errorf("gh %q, want %q", got, wantCreate)
 	}
 }
 
-func TestPRNewNoUpstreamRefuses(t *testing.T) {
-	dir := prRepo(t)
-	prGit(t, dir, "switch", "-q", "-c", "feat/a")
-	prGit(t, dir, "commit", "-q", "--allow-empty", "-m", "a1")
-	prInDir(t, dir)
+func TestPRNewSinglePublishesHeadOnly(t *testing.T) {
+	prInDir(t, prStackRepo(t))
+	pushed, created := prStub(t, "")
 
-	old := ghRun
-	t.Cleanup(func() { ghRun = old })
-	called := false
-	ghRun = func(args ...string) int {
-		called = true
-		return 0
+	if rc := PRNew([]string{"-1", "-d"}); rc != 0 {
+		t.Fatalf("PRNew(-1) = %d, want 0", rc)
 	}
+	if got := strings.Join(*pushed, " "); got != "push --force-with-lease -u origin feat/b" {
+		t.Errorf("pushed %q, want only feat/b", got)
+	}
+	if got := strings.Join(*created, " "); got != "pr create --head feat/b --base feat/a --fill --draft" {
+		t.Errorf("gh %q, want the feat/b draft", got)
+	}
+}
+
+func TestPRNewLeavesAnExistingPR(t *testing.T) {
+	prInDir(t, prStackRepo(t))
+	pushed, created := prStub(t, "42")
+
+	if rc := PRNew(nil); rc != 0 {
+		t.Fatalf("PRNew = %d, want 0", rc)
+	}
+	if len(*pushed) != 2 {
+		t.Errorf("pushed %q, want both branches pushed before their check", *pushed)
+	}
+	if len(*created) != 0 {
+		t.Errorf("gh %q, want no pull request created", *created)
+	}
+}
+
+func TestPRNewStopsWhenAPushFails(t *testing.T) {
+	prInDir(t, prStackRepo(t))
+	prStub(t, "")
+	prRun = func(args ...string) int { return 1 }
+	created := &[]string{}
+	ghRun = func(args ...string) int { *created = append(*created, args[0]); return 0 }
 
 	if rc := PRNew(nil); rc != 1 {
-		t.Fatalf("PRNew with no upstream = %d, want 1", rc)
+		t.Fatalf("PRNew with a failed push = %d, want 1", rc)
 	}
-	if called {
-		t.Error("gh was invoked for a branch with no upstream")
+	if len(*created) != 0 {
+		t.Errorf("gh %q, want no pull request created", *created)
 	}
 }
 
