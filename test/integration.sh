@@ -90,6 +90,26 @@ case "$out" in
 esac
 assert_contains "verbs names" "$("$BIN" verbs)" "log"
 
+echo "per-verb help pages"
+NO_COLOR=1
+export NO_COLOR
+page=$("$BIN" commit -h)
+assert_contains "commit -h shows its title" "$page" "gg commit"
+assert_contains "commit -h shows usage" "$page" "Usage"
+assert_contains "commit -h shows the git equivalent" "$page" "git add -A"
+assert_contains "help commit shows the same page" "$("$BIN" help commit)" "git add -A"
+assert_contains "h commit shows the same page" "$("$BIN" h commit)" "git add -A"
+assert_contains "an alias reaches the canonical page" "$("$BIN" h rename)" "gg describe"
+assert_contains "a shorthand reaches the page" "$("$BIN" st -h)" "gg status"
+assert_contains "a -h after other args still wins" "$("$BIN" commit foo -h)" "gg commit"
+assert_contains "hh has a page" "$("$BIN" hh -h)" "gg hh"
+assert_contains "a bare -h prints the table" "$("$BIN" -h)" "Rollback work"
+out=$("$BIN" nosuchverb -h 2>&1)
+case "$out" in
+*"no page"*) ok "an unknown verb's -h explains the fallback" ;;
+*) no "an unknown verb's -h explains the fallback (got: $out)" ;;
+esac
+
 echo "read-only verbs"
 R=$(newrepo)
 cd "$R" || exit 1
