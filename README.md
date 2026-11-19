@@ -112,6 +112,14 @@ and a positional row with no flag of its own (`branch <name>`) stays there.
 hint: `status -a sta  st -a shows all, st -f stops at five`.
 There is no `hhh`: the description lives in `h -v`, the parameters in `hh -v`.
 
+Every verb also has a full page: `gg <verb> -h`, `gg help <verb>` or `gg h
+<verb>`. The page states what the verb does, its arguments, its flags, worked
+examples, the exact error messages and the git command it replaces. Pages are
+markdown files in `docs/verbs/`, one per registry row, named after the
+canonical verb; an abbreviation or an alias reaches the canonical page.
+`-h`/`--help` wins wherever it sits in the arguments, so it never reaches git.
+An unknown verb has no page: gg says so and points at `gg help <verb>`.
+
 Flags: `-p/--print`, `-n/--dry` print the resolved command instead of running.
 Environment: `GG_ECHO=1` traces the git call, `NO_COLOR=1` disables colour.
 
