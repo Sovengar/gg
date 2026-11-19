@@ -109,3 +109,57 @@ func TestHelpLines(t *testing.T) {
 		}
 	}
 }
+
+func TestEveryVerbHasAPage(t *testing.T) {
+	for _, e := range verbs.All() {
+		if e.DisplayOnly {
+			continue
+		}
+		if _, ok := verbDoc(e); !ok {
+			t.Errorf("%s has no page: want %s", e.Name, verbDocPath(e))
+		}
+	}
+}
+
+func TestVerbPageReachableByName(t *testing.T) {
+	cases := map[string]string{
+		"commit": "commit", "c": "commit", "ce": "ce",
+		"st": "status", "status": "status",
+		"rename": "describe", "desc": "describe",
+		"h": "help", "hh": "hh",
+	}
+	for typed, want := range cases {
+		e, ok := verbs.Lookup(typed)
+		if !ok {
+			t.Errorf("%s does not resolve", typed)
+			continue
+		}
+		if e.Name != want {
+			t.Errorf("%s resolves to %s, want %s", typed, e.Name, want)
+		}
+		page, ok := verbDoc(e)
+		if !ok || !strings.HasPrefix(page, "# gg "+e.Name) {
+			t.Errorf("%s has no page starting with its title", e.Name)
+		}
+	}
+}
+
+func TestHelpTarget(t *testing.T) {
+	cases := []struct {
+		args []string
+		want string
+		ok   bool
+	}{
+		{[]string{"-h"}, "", false},
+		{[]string{"commit", "-h"}, "commit", true},
+		{[]string{"commit", "foo", "--help"}, "commit", true},
+		{[]string{"sd", "--help"}, "sd", true},
+		{[]string{"commit"}, "", false},
+	}
+	for _, c := range cases {
+		got, ok := helpTarget(c.args)
+		if got != c.want || ok != c.ok {
+			t.Errorf("helpTarget(%q) = %q %v, want %q %v", c.args, got, ok, c.want, c.ok)
+		}
+	}
+}

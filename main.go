@@ -54,6 +54,13 @@ func run(argv []string) int {
 	if len(args) == 0 {
 		args = []string{"dash"}
 	}
+	// the help flag wins wherever it sits: it never reaches git
+	if name, ok := helpTarget(args); ok {
+		return verbHelp(name)
+	}
+	if len(args) == 1 && (args[0] == "-h" || args[0] == "--help") {
+		return helpTable(false)
+	}
 
 	switch args[0] {
 	case "help", "h", "hh":
@@ -426,11 +433,21 @@ func footer(verb string) {
 // rows up one step: h, hh, then the parameter hints.
 func help(word string, argv []string) int {
 	verbose := false
+	target := ""
 	for _, a := range argv {
-		switch a {
-		case "-v", "--verbose":
+		switch {
+		case a == "-v" || a == "--verbose":
 			verbose = true
+		case a == "-h" || a == "--help":
+			if target == "" {
+				target = word
+			}
+		case !strings.HasPrefix(a, "-") && target == "":
+			target = a // gg help <verb>: one page instead of the table
 		}
+	}
+	if target != "" {
+		return verbHelp(target)
 	}
 	switch {
 	case word == "hh" && verbose:
@@ -449,7 +466,7 @@ func helpDescribed() int {
 	entries := verbs.All()
 	nameWidth := 0
 	for _, e := range entries {
-		if e.Hidden || e.Variant {
+		if e.Hidden || ridesParent(e) {
 			continue
 		}
 		if n := len(e.Display()); n > nameWidth {
@@ -462,7 +479,7 @@ func helpDescribed() int {
 
 	category := ""
 	for _, e := range entries {
-		if e.Hidden || e.Variant {
+		if e.Hidden || ridesParent(e) {
 			continue
 		}
 		if e.Category != category {
@@ -534,8 +551,8 @@ func helpTable(merged bool) int {
 		extras = variantExtras()
 	}
 	for _, e := range verbs.All() {
-		if e.Hidden || e.Variant {
-			continue // variants ride on their parent's cell
+		if e.Hidden || ridesParent(e) {
+			continue // same-category variants ride on their parent's cell
 		}
 		if _, seen := names[e.Category]; !seen {
 			order = append(order, e.Category)
@@ -578,6 +595,17 @@ func helpTable(merged bool) int {
 	return 0
 }
 
+// ridesParent reports whether a variant row belongs on its parent's cell: only
+// a variant in the same category does, because a category boundary must show in
+// the help. A variant in another category is a row of its own.
+func ridesParent(e verbs.Entry) bool {
+	if !e.Variant {
+		return false
+	}
+	parent, ok := e.Parent()
+	return ok && parent.Category == e.Category
+}
+
 // variantExtras maps a verb to the flags its variant rows carry, in registry
 // order: status -> "-a sta", "-f stf".
 // variantExtras maps a verb to the flags its variant rows carry, in registry
@@ -590,8 +618,8 @@ func variantExtras() map[string][]string {
 			continue
 		}
 		parent, ok := e.Parent()
-		if !ok {
-			continue
+		if !ok || parent.Category != e.Category {
+			continue // another category lists it as its own row
 		}
 		flag := e.VariantFlag()
 		if flag == "" || strings.HasPrefix(flag, "<") {
