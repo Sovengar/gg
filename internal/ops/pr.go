@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"gg/internal/gitx"
+	"gg/internal/ids"
 	"gg/internal/ui"
 )
 
@@ -32,6 +33,9 @@ func PRNew(args []string) int {
 	if len(args) > 0 && args[0] == "review" {
 		return PRReview(args[1:])
 	}
+	if len(args) > 0 && args[0] == "fixup" {
+		return PRFixup(args[1:])
+	}
 	if len(args) > 0 && args[0] == "new" {
 		args = args[1:]
 	}
@@ -48,6 +52,84 @@ func PRNew(args []string) int {
 		}
 	}
 	return 0
+}
+
+// PRFixup adds a review fixup commit instead of rewriting published history:
+// the pull request then shows one new commit, and the fold happens at merge
+// time with a squash merge or `gg rebase -i --autosquash`. The target must be
+// an unpublished-to-this-branch commit: amending a lower PR from the top of the
+// stack would attach the fix to the wrong pull request.
+func PRFixup(args []string) int {
+	if len(args) != 1 {
+		ui.Errf("gg pr fixup <commit>")
+		return 2
+	}
+	sha, ok := prFixupSha(args[0])
+	if !ok {
+		ui.Errf("gg pr fixup: no commit named %q", args[0])
+		return 1
+	}
+	if gitx.InWip() {
+		ui.Errf("gg pr fixup: HEAD is a wip commit. Run gg c -m <msg> first, then fixup.")
+		return 1
+	}
+	branch, err := gitx.Output("rev-parse", "--abbrev-ref", "HEAD")
+	if err != nil || branch == "" || branch == "HEAD" {
+		ui.Errf("gg pr fixup: detached HEAD, switch to the PR branch first")
+		return 1
+	}
+	base := prFixupBase(branch)
+	own, err := gitx.Output("rev-list", base+"..HEAD")
+	if err != nil || !hasLine(own, sha) {
+		ui.Errf("gg pr fixup: %s does not belong to %s (the commits above %s)", abbrev(sha), branch, base)
+		ui.Errf("gg pr fixup: run gg go <branch> for the pull request that owns it")
+		return 1
+	}
+	if _, err := gitx.Output("merge-base", "--is-ancestor", sha, "origin/"+branch); err != nil {
+		ui.Errf("gg pr fixup: %s is not published on origin/%s", abbrev(sha), branch)
+		ui.Errf("gg pr fixup: fix an unpublished commit with gg amend %s", args[0])
+		return 1
+	}
+	if rc := gitx.Run("add", "-A"); rc != 0 {
+		return rc
+	}
+	return gitx.Run("commit", "--fixup="+sha)
+}
+
+// prFixupBase names the ref a branch's own commits start above: the pull
+// request base when gh can name it, so a stack that has already moved still
+// tells which PR owns a commit, and the derived stack parent otherwise.
+func prFixupBase(branch string) string {
+	base, err := ghOutput("pr", "view", branch, "--json", "baseRefName", "-q", ".baseRefName")
+	if err != nil || base == "" {
+		base = prBase(branch)
+	}
+	if _, err := gitx.Output("rev-parse", "--verify", "--quiet", "origin/"+base); err == nil {
+		return "origin/" + base
+	}
+	return base
+}
+
+// prFixupSha resolves a changeId, or any ref git already knows.
+func prFixupSha(token string) (string, bool) {
+	token = strings.TrimPrefix(token, "@")
+	if ix, err := ids.Load(); err == nil {
+		if ref, status := ix.Resolve(token); status == ids.Resolved {
+			return ref.SHA, true
+		}
+	}
+	sha, err := gitx.Output("rev-parse", "--verify", "--quiet", token+"^{commit}")
+	return sha, err == nil && sha != ""
+}
+
+// hasLine reports whether text holds line as one of its lines.
+func hasLine(text, line string) bool {
+	for _, l := range strings.Split(text, "\n") {
+		if l == line {
+			return true
+		}
+	}
+	return false
 }
 
 // prPublish pushes one branch and opens its pull request. A branch that
