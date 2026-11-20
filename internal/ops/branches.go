@@ -11,9 +11,9 @@ import (
 )
 
 // Branches lists branches newest first, each with its own branch changeId, or
-// switches to one. It never creates a branch by accident: only "branch -c"
-// (or its old "branch new" form) and "cbr" create, so a mistyped name fails
-// with a direction instead of silently branching off HEAD.
+// switches to one. It never creates a branch by accident: only "branch create"
+// (or its older "-c" and "new" forms) and "cbr" create, so a mistyped name
+// fails with a direction instead of silently branching off HEAD.
 func Branches(args []string) int {
 	if len(args) == 0 {
 		return listBranches()
@@ -25,7 +25,7 @@ func Branches(args []string) int {
 		}
 		if createFlag(args[0]) {
 			if len(args) < 2 {
-				ui.Errf("gg branch -c <name>: name the branch to create")
+				ui.Errf("gg branch create <name>: name the branch to create")
 				return 2
 			}
 			return createBranch(args[1:])
@@ -50,9 +50,9 @@ func Branches(args []string) int {
 		// other flags belong to git branch: -r, -v, --merged and friends
 		return gitx.Run(append([]string{"branch"}, args...)...)
 	}
-	if args[0] == "new" {
+	if args[0] == "create" || args[0] == "new" {
 		if len(args) < 2 {
-			ui.Errf("gg branch new <name>: name the branch to create")
+			ui.Errf("gg branch create <name>: name the branch to create")
 			return 2
 		}
 		return createBranch(args[1:])

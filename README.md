@@ -34,7 +34,7 @@ gg br -lr          remote branches only
 gg br -a           the stacks: each branch under the one it was cut from
 gg br -la          local and remote branches in one list
 gg br -lm          branches already merged into HEAD (br -lm main: into main)
-gg branch -c side  create a branch and switch to it (alias: cbr; branch new works too)
+gg branch create side  create a branch and switch to it (alias: cbr)
 gg discard side    delete a branch, its tip kept in refs/gg/deleted
 gg discard <id>    drop that commit too (git history drop)
 gg discard side -f force a delete the tree or history would refuse
