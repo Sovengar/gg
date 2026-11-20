@@ -72,6 +72,7 @@ gg pr              open PRs bottom-up for this branch and the stack it stands on
 gg pr -1           the branch alone; -d makes them drafts (extra args go to gh verbatim)
 gg pr review 42    mount that PR in its own worktree, commits intact (alias: rpr)
 gg pr review 42 edit  the same, with the PR diff live in the tree (alias: epr)
+gg pr fixup <id>   one reviewed fix as its own commit; squash merge folds it (alias: fpr)
 gg land <branch>   fast-forward the target onto it and push: no PR, no CI
 gg land -b rel     land on that target instead; -y skips the confirmation
 gg land --stack    land the whole chain above the branch in one push (alias: -s)

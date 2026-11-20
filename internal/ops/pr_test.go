@@ -344,3 +344,129 @@ func TestPRReviewEditLeavesDiffLive(t *testing.T) {
 		t.Errorf("staged diff = %q, want it to hold the PR change", staged)
 	}
 }
+
+// prFixupRepo builds a repository with a bare origin, main pushed, and a
+// two-branch stack feat/a -> feat/b pushed, on feat/a.
+func prFixupRepo(t *testing.T) (dir, a, b string) {
+	t.Helper()
+	dir = t.TempDir()
+	prGit(t, dir, "init", "-q", "-b", "main", ".")
+	prGit(t, dir, "config", "user.email", "test@example.com")
+	prGit(t, dir, "config", "user.name", "Test")
+	prGit(t, dir, "commit", "-q", "--allow-empty", "-m", "init")
+	remote := filepath.Join(t.TempDir(), "origin.git")
+	if err := os.MkdirAll(remote, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	prGit(t, remote, "init", "-q", "--bare", ".")
+	prGit(t, dir, "remote", "add", "origin", remote)
+	prGit(t, dir, "push", "-qu", "origin", "main")
+
+	prGit(t, dir, "switch", "-q", "-c", "feat/a")
+	prWrite(t, dir, "a.txt")
+	prGit(t, dir, "add", "-A")
+	prGit(t, dir, "commit", "-qm", "a1")
+	a = prGit(t, dir, "rev-parse", "HEAD")
+	prGit(t, dir, "push", "-qu", "origin", "feat/a")
+
+	prGit(t, dir, "switch", "-q", "-c", "feat/b")
+	prWrite(t, dir, "b.txt")
+	prGit(t, dir, "add", "-A")
+	prGit(t, dir, "commit", "-qm", "b1")
+	b = prGit(t, dir, "rev-parse", "HEAD")
+	prGit(t, dir, "push", "-qu", "origin", "feat/b")
+	prInDir(t, dir)
+	return dir, a, b
+}
+
+// prFixupBases stubs the PR base lookup, so the guard reads the base the forge
+// reports without calling gh.
+func prFixupBases(t *testing.T, bases map[string]string) {
+	t.Helper()
+	old := ghOutput
+	t.Cleanup(func() { ghOutput = old })
+	ghOutput = func(args ...string) (string, error) {
+		if len(args) >= 3 {
+			if base, ok := bases[args[2]]; ok {
+				return base, nil
+			}
+		}
+		return "", errors.New("no pull request")
+	}
+}
+
+func TestPRFixupCreatesAVisibleCommit(t *testing.T) {
+	dir, _, _ := prFixupRepo(t)
+	prFixupBases(t, map[string]string{"feat/a": "main"})
+	prGit(t, dir, "switch", "-q", "feat/a")
+	head := prGit(t, dir, "rev-parse", "HEAD")
+	prWrite(t, dir, "review.txt")
+
+	if rc := PRFixup([]string{"@HEAD"}); rc != 0 {
+		t.Fatalf("PRFixup = %d, want 0", rc)
+	}
+	if got := prGit(t, dir, "log", "-1", "--format=%s"); got != "fixup! a1" {
+		t.Errorf("subject = %q, want fixup! a1", got)
+	}
+	if got := prGit(t, dir, "rev-parse", "HEAD^"); got != head {
+		t.Errorf("fixup parent = %q, want %q", got, head)
+	}
+	if got := prGit(t, dir, "log", "--format=%s", "origin/feat/a..HEAD"); got != "fixup! a1" {
+		t.Errorf("origin/feat/a..HEAD = %q, want one fixup commit", got)
+	}
+}
+
+func TestPRFixupRefusesAForeignCommit(t *testing.T) {
+	dir, a, _ := prFixupRepo(t)
+	prFixupBases(t, map[string]string{"feat/a": "main", "feat/b": "feat/a"})
+	prWrite(t, dir, "review.txt")
+	// HEAD is feat/b; a1 belongs to feat/a, so the fix would land on the wrong PR.
+	if rc := PRFixup([]string{a}); rc != 1 {
+		t.Fatalf("PRFixup(foreign) = %d, want 1", rc)
+	}
+	if got := prGit(t, dir, "log", "-1", "--format=%s"); got != "b1" {
+		t.Errorf("HEAD moved to %q, want b1 untouched", got)
+	}
+}
+
+func TestPRFixupRefusesAForeignCommitWhenTheStackMoved(t *testing.T) {
+	dir, a, _ := prFixupRepo(t)
+	prFixupBases(t, map[string]string{"feat/a": "main", "feat/b": "feat/a"})
+	// A fixup on feat/a moves its tip, so the derived stack can no longer see
+	// feat/a under feat/b; the forge-reported base still names the real owner.
+	prGit(t, dir, "switch", "-q", "feat/a")
+	prWrite(t, dir, "review-a.txt")
+	if rc := PRFixup([]string{"HEAD"}); rc != 0 {
+		t.Fatalf("PRFixup on feat/a = %d, want 0", rc)
+	}
+	prGit(t, dir, "switch", "-q", "feat/b")
+	prWrite(t, dir, "review-b.txt")
+	if rc := PRFixup([]string{a}); rc != 1 {
+		t.Fatalf("PRFixup(foreign after the stack moved) = %d, want 1", rc)
+	}
+}
+
+func TestPRFixupRefusesAnUnpublishedCommit(t *testing.T) {
+	dir := prRepo(t)
+	prFixupBases(t, map[string]string{})
+	prGit(t, dir, "switch", "-q", "-c", "feat/x")
+	prGit(t, dir, "commit", "-q", "--allow-empty", "-m", "x1")
+	prWrite(t, dir, "review.txt")
+	prInDir(t, dir)
+
+	if rc := PRFixup([]string{"HEAD"}); rc != 1 {
+		t.Fatalf("PRFixup(unpublished) = %d, want 1", rc)
+	}
+	if got := prGit(t, dir, "log", "-1", "--format=%s"); got != "x1" {
+		t.Errorf("HEAD moved to %q, want x1 untouched", got)
+	}
+}
+
+func TestPRFixupNeedsExactlyOneArgument(t *testing.T) {
+	if rc := PRFixup(nil); rc != 2 {
+		t.Errorf("PRFixup(nil) = %d, want 2", rc)
+	}
+	if rc := PRFixup([]string{"a", "b"}); rc != 2 {
+		t.Errorf("PRFixup(two) = %d, want 2", rc)
+	}
+}

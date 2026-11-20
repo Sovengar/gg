@@ -78,6 +78,7 @@ var functions = map[string]func([]string) int{
 	"go":           ops.Go,
 	"shell":        ops.Shell,
 	"prNew":        ops.PRNew,
+	"prFixup":      ops.PRFixup,
 	"prReview":     ops.PRReview,
 	"prReviewEdit": ops.PRReviewEdit,
 	"land":         ops.Land,
@@ -143,7 +144,7 @@ var mutating = map[string]bool{
 	"cbr": true,
 	"mg":  true, "wt": true, "merge": true,
 	"fork": true, "ship": true,
-	"pr": true, "rpr": true, "epr": true, "land": true,
+	"pr": true, "fpr": true, "rpr": true, "epr": true, "land": true,
 }
 
 var table, rows = parse(registry)
@@ -304,11 +305,23 @@ func (e Entry) Display() string {
 	return e.Name + " " + strings.Join(e.Abbrevs, ", ")
 }
 
-// DisplayParts cuts Display() into the plain name and the rest of the column,
-// the shorthands and the flags, which help paints grey.
+// DisplayParts cuts Display() into the command, which help paints cyan, and
+// the abbreviation at the end of the column, which help paints grey. The whole
+// command stays cyan: "pr fixup fpr" names the command "pr fixup" and its
+// shorthand "fpr", not a verb "pr" with a flag.
 func (e Entry) DisplayParts() (name, note string) {
 	display := e.Display()
-	if i := strings.Index(display, " "); i >= 0 {
+	if e.Shown == "" {
+		// no display override: the name is one word and the abbreviations
+		// follow it, so every shorthand stays grey
+		if i := strings.Index(display, " "); i >= 0 {
+			return display[:i], display[i:]
+		}
+		return display, ""
+	}
+	// a display override ends in its abbreviation: keep the whole command
+	// cyan ("pr fixup") and only the shorthand grey ("fpr")
+	if i := strings.LastIndex(display, " "); i >= 0 {
 		return display[:i], display[i:]
 	}
 	return display, ""
