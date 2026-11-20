@@ -24,7 +24,7 @@ type Index struct {
 func Load() *Index {
 	ix := &Index{changeIDs: map[string]string{}, raws: map[string]string{}, byToken: map[string]string{}, ambig: map[string][]string{}}
 
-	lines, err := gitx.OutputAll("status", "--short", "--untracked-files=all")
+	lines, err := gitx.OutputLines("status", "--short", "--untracked-files=all")
 	if err != nil {
 		return ix
 	}

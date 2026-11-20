@@ -66,6 +66,23 @@ func OutputAll(args ...string) ([]string, error) {
 	return strings.Split(out, "\n"), nil
 }
 
+// OutputLines runs git and returns its lines without trimming them. Output
+// trims the whole blob, which eats the leading status column of a first line
+// such as " M path"; a reader that parses a fixed column layout must use this.
+func OutputLines(args ...string) ([]string, error) {
+	cmd := exec.Command("git", quoted(args)...)
+	cmd.Stderr = nil
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+	text := strings.TrimRight(string(out), "\r\n")
+	if text == "" {
+		return nil, nil
+	}
+	return strings.Split(text, "\n"), nil
+}
+
 // OutputBin runs an external binary and returns trimmed stdout.
 func OutputBin(bin string, args ...string) (string, error) {
 	cmd := exec.Command(bin, args...)

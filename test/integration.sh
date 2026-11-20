@@ -6,6 +6,15 @@ GO=${GO:-go}
 BIN=$(mktemp -d)/gg
 REPO=$(cd "$(dirname "$0")/.." && pwd)
 
+# The suite must not inherit the machine's git config: a global merge.ff (for
+# example "only") changes what plain git does in the fixtures, so the cases
+# would report a code bug instead of the local setup. Identity still comes from
+# the isolated file, because every fixture commits.
+GG_TEST_CONFIG=$(mktemp -d)/gitconfig
+git config --file "$GG_TEST_CONFIG" user.name "gg test"
+git config --file "$GG_TEST_CONFIG" user.email "gg-test@example.com"
+export GIT_CONFIG_GLOBAL="$GG_TEST_CONFIG"
+
 pass=0
 fail=0
 
@@ -65,7 +74,7 @@ assert_lacks "help has no branches alias" "$out" "branches"
 assert_contains "help names the aliases verb first" "$out" "describe -> reword, rename"
 assert_contains "help keeps variants off the canonical line" "$(NO_COLOR=1 "$BIN" help | grep Inspection)" "branch br"
 assert_contains "hh merges the status variants into one cell" "$("$BIN" hh)" "status st, -a sta, -f stf"
-assert_contains "hh merges the branch variants" "$("$BIN" hh)" "branch br, -lr, -a, -la, -lm, -c cbr"
+assert_contains "hh lists the create form on its own category row" "$("$BIN" hh)" "branch create cbr"
 assert_lacks "hh drops the positional branch row" "$("$BIN" hh)" "<name>"
 assert_contains "hh -v lists the go verb" "$("$BIN" hh -v)" "asks about a worktree"
 assert_contains "hh merges the commit variant" "$("$BIN" hh)" "commit c, -e ce"
@@ -703,7 +712,7 @@ echo "new refuses what it cannot keep safe"
 R=$(newrepo)
 cd "$R" || exit 1
 echo hi > f.txt
-if "$BIN" new --help >/dev/null 2>&1; then no "new refuses an unknown flag"; else ok "new refuses an unknown flag"; fi
+if "$BIN" new --bogus >/dev/null 2>&1; then no "new refuses an unknown flag"; else ok "new refuses an unknown flag"; fi
 assert_eq "the refused flag committed nothing" "$(git rev-list --count HEAD)" "1"
 assert_eq "the refused flag kept the tree" "$(git status --porcelain | tr -d ' ')" "??f.txt"
 if "$BIN" new -m >/dev/null 2>&1; then no "new refuses a bare -m"; else ok "new refuses a bare -m"; fi

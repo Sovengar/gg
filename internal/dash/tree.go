@@ -192,7 +192,7 @@ func emptyNote(n int, scoped bool) string {
 // left out: the changeIds still cover the whole tree, so a verb can still take
 // one the lane does not draw.
 func fileRows() []string {
-	lines, err := gitx.OutputAll("status", "--short", "--untracked-files=all")
+	lines, err := gitx.OutputLines("status", "--short", "--untracked-files=all")
 	if err != nil {
 		return nil
 	}
@@ -288,7 +288,7 @@ func lanesOf(sha string, n int, opt view) ([]lane, string) {
 		current = ""
 	}
 	base := baseFor()
-	
+
 	var names []string
 	switch {
 	case workspace:
