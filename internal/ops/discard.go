@@ -209,7 +209,7 @@ func discardPaths(paths []string) int {
 		for _, p := range fresh {
 			ui.Errf("    %s", p)
 		}
-		ui.Errf("gg discard: nothing touched. gg clear deletes new files.")
+		ui.Errf("gg discard: nothing touched. gg discard zz deletes new files.")
 		return 1
 	}
 	argv := append([]string{"restore", "--source=HEAD", "--staged", "--worktree", "--"}, known...)
