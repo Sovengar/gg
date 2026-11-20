@@ -283,10 +283,44 @@ func lanesOf(sha string, n int, opt view) ([]lane, string) {
 	if current == "HEAD" {
 		current = ""
 	}
+	workspace := current == "gitbutler/workspace"
+	if workspace {
+		current = ""
+	}
 	base := baseFor()
-
+	
 	var names []string
 	switch {
+	case workspace:
+		// gitbutler/workspace is internal bookkeeping, not a branch lane.
+		def := defaultBranch()
+		if opt.newest {
+			for _, b := range localBranches() {
+				if len(names) >= opt.lanes {
+					break
+				}
+				if len(names) == opt.lanes-1 && def != "" && b.name != def {
+					continue
+				}
+				names = append(names, b.name)
+			}
+			if def != "" && !hasName(names, def) && len(names) < opt.lanes {
+				names = append(names, def)
+			}
+		} else {
+			trees := map[string]bool{}
+			for _, b := range ops.WorktreeBranches() {
+				trees[b] = true
+			}
+			for _, b := range localBranches() {
+				if len(names) >= opt.lanes {
+					break
+				}
+				if trees[b.name] {
+					names = append(names, b.name)
+				}
+			}
+		}
 	case current == "":
 		names = []string{"detached"}
 	case opt.newest:
