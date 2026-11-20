@@ -45,19 +45,41 @@ func splitArgs(args []string) (flags, revisions []string) {
 // the value files.HunksOf reads so the printed hunk id names the same region.
 const contextLines = 3
 
-// Run draws the diff of the working tree. When stdout is not a terminal it
-// falls back to plain git diff, so pipes and scripts still parse.
-func Run(args []string) int {
-	if !ui.IsTTY(os.Stdout) {
-		return gitx.Run(append([]string{"diff"}, args...)...)
+// idsFlag asks for the per-hunk changeIds. Without it `gg diff` is plain
+// `git diff`, so the user's own pager (delta, less) draws it.
+const idsFlag = "--ids"
+
+// takeIDs reports whether the args ask for hunk changeIds, and removes the
+// flag so git never sees it.
+func takeIDs(args []string) (bool, []string) {
+	rest := make([]string, 0, len(args))
+	found := false
+	for _, a := range args {
+		if a == idsFlag {
+			found = true
+			continue
+		}
+		rest = append(rest, a)
 	}
-	out, err := gitx.OutputAll(append([]string{"diff", "--no-color", "--no-ext-diff"}, args...)...)
+	return found, rest
+}
+
+// Run draws the diff of the working tree. By default it runs plain git diff,
+// so a pager such as delta keeps its own layout. The boxes, and with them the
+// per-hunk changeIds, are opt-in through --ids. A pipe always gets git diff,
+// so scripts still parse.
+func Run(args []string) int {
+	wantIDs, rest := takeIDs(args)
+	if !wantIDs || !ui.IsTTY(os.Stdout) {
+		return gitx.Run(append([]string{"diff"}, rest...)...)
+	}
+	out, err := gitx.OutputAll(append([]string{"diff", "--no-color", "--no-ext-diff"}, rest...)...)
 	if err != nil || len(out) == 0 {
 		return 0
 	}
 	// a revision argument reads committed history, so its regions are not
 	// hunks any verb can act on; flags such as -w still describe the tree
-	flags, revisions := splitArgs(args)
+	flags, revisions := splitArgs(rest)
 	render(parse(out), len(revisions) == 0, flags...)
 	return 0
 }

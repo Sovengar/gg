@@ -20,7 +20,7 @@ sta	fn:treeAll	every changed path under every commit	hint:st -a shows all, st -f
 stf	fn:treeFull	up to five changed paths under every commit	hint:st -a lifts the cap	display:status -f stf	variant
 log|l	fn:log	graph log, 6 commits by default	hint:Takes a count, -l for long lines
 dash	fn:dash	dashboard: the tree over the newest branches	hidden
-diff	fn:diff	diff the tree in boxes	hint:Use -w to ignore whitespace
+diff	fn:diff	diff the tree	hint:-w ignores whitespace. --ids names each hunk
 show|sh	show	one commit in full	hint:Takes a changeId
 branch|br	fn:branches	list branches, or switch to one	hint:bare lists local changeIds. -a stacks, -lr remote, -la both, -lm merged, new <name> creates
 brlr	branch -r	remote branches, straight from git	display:br -lr	variant
