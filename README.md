@@ -43,8 +43,9 @@ gg tag             tags newest version first, with the message (alias: t)
 gg tag -m v1.2.0   create one; -d deletes, -s signs
 gg remote          configured remotes, names and urls
 gg remote add up ..  add, rename, rm and set-url reach git
-gg diff            diff in boxes, one per change (plain git diff when piped)
+gg diff            plain git diff, so your pager (delta) draws it
 gg diff -w         diff ignoring whitespace
+gg diff --ids      boxes with one changeId per hunk, for gg discard
 gg copy kd main    copy that commit onto main, back on your branch after (alias: cp)
 gg copy kd         copy it onto the branch you are on
 gg c -m "msg"      commit every dirty path (alias: commit; ce excludes)
@@ -394,10 +395,14 @@ dashboard. The base is the merge base with `gitbutler/target`,
 the default branch or the upstream. `gg st 10` overrides how many commits each
 lane lists; gitbutler's own refs never become lanes.
 
-`gg diff` draws the same boxes `but diff` draws: a border sized to the title,
-the file changeId and path, then a gutter of old and new line numbers with red
-removals and green additions. When stdout is not a terminal it runs plain
-`git diff`, so pipes still parse.
+`gg diff` runs plain `git diff`, so the pager you configured draws it.
+
+`gg diff --ids` draws the same boxes `but diff` draws: a border sized to the
+title, the file changeId and path, then a gutter of old and new line numbers
+with red removals and green additions. Each box title carries the hunk
+changeId that `gg discard <changeId>` takes, which is the only reason the boxes
+exist. When stdout is not a terminal either form runs plain `git diff`, so
+pipes still parse.
 
 ### Built on git history
 

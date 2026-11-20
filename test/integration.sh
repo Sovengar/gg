@@ -904,7 +904,7 @@ sed -i 's/^line25$/X25/' h.txt
 fid=$("$BIN" st | grep ' h.txt$' | awk '{print $2}')
 case "$fid" in [k-z]*) ok "a dirty file shows its changeId" ;; *) no "a dirty file shows its changeId (got $fid)" ;; esac
 if command -v script >/dev/null 2>&1; then
-	handles=$(script -qec "$BIN diff" /dev/null 2>/dev/null \
+	handles=$(script -qec "$BIN diff --ids" /dev/null 2>/dev/null \
 		| sed -e 's/\x1b\[[0-9;]*m//g' | grep -oE '^[k-z]+:[0-9a-f]{1,8}' | head -2)
 	assert_eq "the diff names one handle per hunk" "$(printf '%s\n' "$handles" | wc -l | tr -d ' ')" "2"
 	first=$(printf '%s\n' "$handles" | sed -n 1p)
