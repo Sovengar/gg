@@ -52,7 +52,7 @@ edit|e	fn:edit	stop a rebase at a commit	hint:Takes a changeId
 rebase|rb	fn:rebase	replay commits onto another base	hint:Takes a branch, -i for interactive
 
 # --- Branching ---
-cbr	switch -c	branch new and switch	hint:Takes a branch. branch new <name> works too	display:branch -c cbr	variant
+cbr	switch -c	branch create and switch	hint:Takes a branch	display:branch create cbr	variant
 merge|mg	fn:merge	merge a branch into this one	hint:Takes a branch. Fast-forward only; --no-ff keeps a merge commit
 go	fn:go	go where a branch lives	hint:Takes a branch. A missing one asks about a worktree; -- cmd runs there
 wt	fn:wt	parallel branches, one worktree each	hint:Takes new|ls|rm. fork and discard are the named verbs
